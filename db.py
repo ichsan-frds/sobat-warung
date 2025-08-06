@@ -1,4 +1,5 @@
-from pymongo import AsyncMongoClient, ServerApi
+from pymongo import AsyncMongoClient
+from pymongo.server_api import ServerApi
 from dotenv import load_dotenv
 import os
 
