@@ -9,4 +9,4 @@ class TransactionCreate(BaseModel):
     total_price: float
 
 class TransactionOut(TransactionCreate):
-    id: str
+    transaction_id: str
