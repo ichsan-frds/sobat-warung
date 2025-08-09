@@ -82,7 +82,7 @@ Contoh: *Nama : Budi*"""
             
             owner_data = await owner.find_one({"phone_number": form_data["From"]})
             owner_id = owner_data.get("_id")
-            await owner.update_one({"phone_number": form_data["From"]}, {"$set": {"state": "INPUT_LOKASI_WARUNG"}})
+            await owner.update_one({"phone_number": form_data["From"]}, {"$set": {"state": "INPUT_WILAYAH_WARUNG"}})
 
             await warung.insert_one({
                 "warung_name": warung_name,
@@ -94,7 +94,65 @@ Contoh: *Nama : Budi*"""
                     to = form_data["From"],
                     from_ = os.getenv("FROM_WA_NUMBER"),
                     body=f"""Terimakasih *{warung_name}*!
-Terakhir silahkan isi lokasi warungmu.
+Kemudian silahkan isi wilayah warungmu.  
+Contoh: *Desa : Bojong Kulur*
+*Kecamatan : Gunung Putri*
+*Kabupaten : Bogor*
+*Provinsi : Jawa Barat*
+
+❗Tulis setiap informasi di baris baru (tekan *Enter*
+atau *Shift+Enter* di PC/Laptop)""",
+)
+        except Exception:
+                # UNCOMMENT KALAU INGIN MENGIRIM PESAN DARI BOT KE USER ($0.01 / msg)
+                message = client.messages.create(
+                        to = form_data["From"],
+                        from_ = os.getenv("FROM_WA_NUMBER"),
+                        body="""Format salah!
+Ketik dengan format: *Warung : Nama Warung*  
+Contoh: *Warung : Ramirez Jatinangor*""",
+)
+                
+    elif state == "INPUT_WILAYAH_WARUNG":  
+        try:
+            if (
+                    ("Desa :" in form_data["Body"] or "Kelurahan :" in form_data["Body"]) 
+                    and "Kecamatan :" in form_data["Body"] 
+                    and ("Kota :" in form_data["Body"] or "Kabupaten :" in form_data["Body"]) 
+                    and "Provinsi :" in form_data["Body"]
+            ):
+                lines = form_data["Body"].split("\n")
+                desa_kel = kecamatan = kota_kab = provinsi = None
+                for line in lines:
+                    if line.startswith("Desa :") or line.startswith("Kelurahan :"):
+                        desa_kel = line.split(":", 1)[1].strip()
+                    elif line.startswith("Kecamatan :"):
+                        kecamatan = line.split(":", 1)[1].strip()
+                    elif line.startswith("Kota :") or line.startswith("Kabupaten :"):
+                        kota_kab = line.split(":", 1)[1].strip()
+                    elif line.startswith("Provinsi :"):
+                        provinsi = line.split(":", 1)[1].strip()
+                if not desa_kel or not kecamatan or not kota_kab or not provinsi:
+                    raise HTTPException(status_code=400, detail="Tidak boleh ada yang kosong")
+                
+            else:
+                raise HTTPException(status_code=400, detail="Format tidak sesuai")
+            
+            owner_data = await owner.find_one({"phone_number": form_data["From"]})
+            owner_id = owner_data.get("_id")
+            await owner.update_one({"phone_number": form_data["From"]}, {"$set": {"state": "INPUT_LOKASI_WARUNG"}})
+
+            await warung.update_one({"owner_id": owner_id},
+                                    {"$set": {"desa/kelurahan": desa_kel, 
+                                              "kecamatan": kecamatan,
+                                              "kota/kabupaten": kota_kab,
+                                              "provinsi": provinsi}})
+
+            # UNCOMMENT KALAU INGIN MENGIRIM PESAN DARI BOT KE USER ($0.01 / msg)
+            message = client.messages.create(
+                    to = form_data["From"],
+                    from_ = os.getenv("FROM_WA_NUMBER"),
+                    body=f"""Kemudian silahkan isi lokasi warungmu.
 Kamu bisa kirim *share location* langsung (jika posisi sekarang di warung),
 atau *isi manual* koordinatnya.
 Ketik dengan format: *Latitude : angka, Longitude : angka*  
@@ -106,8 +164,12 @@ Contoh: *Latitude : -6.23, Longitude : 106.82*""",
                         to = form_data["From"],
                         from_ = os.getenv("FROM_WA_NUMBER"),
                         body="""Format salah!
-Ketik dengan format: *Warung : Nama Warung*  
-Contoh: *Warung : Ramirez Jatinangor*""",
+❗Tulis setiap informasi di baris baru (tekan *Enter*
+atau *Shift+Enter* di PC/Laptop)
+Contoh: *Desa : Bojong Kulur*
+*Kecamatan : Gunung Putri*
+*Kabupaten : Bogor*
+*Provinsi : Jawa Barat*""",
 )
             
     elif state == "INPUT_LOKASI_WARUNG":  
@@ -131,7 +193,7 @@ Contoh: *Warung : Ramirez Jatinangor*""",
             
             owner_data = await owner.find_one({"phone_number": form_data["From"]})
             owner_id = owner_data.get("_id")
-            await owner.update_one({"phone_number": form_data["From"]}, {"$set": {"state": "MENU"}})
+            await owner.update_one({"phone_number": form_data["From"]}, {"$set": {"state": "TIPE_WARUNG"}})
 
             await warung.update_one({"owner_id": owner_id},{"$set": {"latitude": latitude, "longitude": longitude}})
 
@@ -139,12 +201,12 @@ Contoh: *Warung : Ramirez Jatinangor*""",
             message = client.messages.create(
                     to = form_data["From"],
                     from_ = os.getenv("FROM_WA_NUMBER"),
-                    body=f"""👋 Hai {owner_name}!
-Selamat datang di Sobat Warung.
-Balas *angka* untuk pilih menu berikut :
-1. Setor Penjualan Hari Ini
-2. Prediksi Permintaan Besok
-3. Cek Stok Warung""",
+                    body=f"""Kemudian silahkan isi tipe warungmu.
+Balas *A/B/C/D* sesuai *jumlah barang merk berbeda* yang dijual warung-mu:
+A. Menjual > 100 Barang Beda Merk
+B. Menjual 50 - 100 Barang Beda Merk
+C. Menjual 20 - 50 Barang Beda Merk
+D. Menjual < 20 Barang Beda Merk""",
 )
         except Exception:
             # UNCOMMENT KALAU INGIN MENGIRIM PESAN DARI BOT KE USER ($0.01 / msg)
@@ -157,7 +219,44 @@ atau *isi manual* koordinatnya.
 Ketik dengan format: *Latitude : angka, Longitude : angka*  
 Contoh: *Latitude : -6.23, Longitude : 106.82*""",
 )
+
+    elif state == "TIPE_WARUNG":  
+        try:
+            if form_data["Body"] in ['A', 'B', 'C', 'D']:
+                owner_data = await owner.find_one({"phone_number": form_data["From"]})
+                owner_id = owner_data.get("_id")
+                owner_name = owner_data.get("owner_name", "Sobat Warung")
+                await owner.update_one({"phone_number": form_data["From"]}, {"$set": {"state": "MENU"}})
+
+                await warung.update_one({"owner_id": owner_id},{"$set": {"type": form_data["Body"]}})
+                
+            else:
+                raise HTTPException(status_code=400, detail="Format tidak sesuai")
         
+            # UNCOMMENT KALAU INGIN MENGIRIM PESAN DARI BOT KE USER ($0.01 / msg)
+            message = client.messages.create(
+                    to = form_data["From"],
+                    from_ = os.getenv("FROM_WA_NUMBER"),
+                    body=f"""👋 Hai {owner_name}!
+Selamat datang di Sobat Warung.
+Balas *angka* untuk pilih menu berikut :
+1. Setor Penjualan Hari Ini
+2. Prediksi Permintaan Besok
+3. Cek Stok Warung""",
+)
+        except Exception:
+                # UNCOMMENT KALAU INGIN MENGIRIM PESAN DARI BOT KE USER ($0.01 / msg)
+                message = client.messages.create(
+                        to = form_data["From"],
+                        from_ = os.getenv("FROM_WA_NUMBER"),
+                        body="""Format salah!
+Balas *A/B/C/D* sesuai *jumlah barang merk berbeda* yang dijual warung-mu:
+A. Menjual > 100 Barang Beda Merk
+B. Menjual 50 - 100 Barang Beda Merk
+C. Menjual 20 - 50 Barang Beda Merk
+D. Menjual < 20 Barang Beda Merk"""
+)
+
     elif state == "MENU":
         if form_data["Body"] == '1': 
             # UNCOMMENT KALAU INGIN MENGIRIM PESAN DARI BOT KE USER ($0.01 / msg)
@@ -169,7 +268,10 @@ Contoh: *Latitude : -6.23, Longitude : 106.82*""",
 Ketik dengan format: *Terjual : Barang, jumlah; Barang, jumlah; ...*  
 Contoh: *Terjual : Indomie, 10; Teh Gelas, 5*"""
 )
-        elif "Setor :" in form_data["Body"]:
+        elif "Terjual :" in form_data["Body"]:
+            # Kurangin stock_count dari collection STOCK
+
+            # Update collection TRANSACTION
             pass
         
         elif form_data["Body"] == '2':
@@ -192,7 +294,8 @@ Contoh: *Terjual : Indomie, 10; Teh Gelas, 5*"""
                     body =
                     """Silahkan input Stok barang toko anda
 Ketik dengan format: *Barang, jumlah, harga; Barang, jumlah, harga; ...*
-Contoh: *Indomie, 10, 3000; Teh Gelas, 5, 1000*"""
+Contoh: *Indomie, 10, 3000; Teh Gelas, 5, 1000*""",
+                    media_url="https://docs.google.com/spreadsheets/d/1y6zzHWrF3P82XrEjDs9k7lzu9Iujvdzstqm7Cs_dQrI/export?format=xlsx"
 )
         
         else:
