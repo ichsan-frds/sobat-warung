@@ -65,7 +65,7 @@ async def whatsapp_webhook(request: Request):
             owner_id = owner_data.get("_id")
             await owner.update_one({"phone_number": form_data["From"]}, {
                 "$set": {
-                    "state": "INPUT_LOKASI_WARUNG"
+                    "state": "INPUT_WILAYAH_WARUNG"
                     }
                 })
 
@@ -120,7 +120,7 @@ async def whatsapp_webhook(request: Request):
             if form_data["MessageType"] == "location":
                 latitude = form_data["Latitude"]
                 longitude = form_data["Longitude"]
-            elif "Latitude :" in form_data["Body"] and "Longitude :" in form_data["Body"]:
+            elif "Latitude :" in form_data["Body"]:
                 latitude = form_data["Body"].split("Latitude :")[1].split(",")[0].strip()
                 longitude = form_data["Body"].split("Longitude :")[1].strip()
             else:
@@ -133,24 +133,24 @@ async def whatsapp_webhook(request: Request):
             longitude = float(longitude)
             
             owner_data = await owner.find_one({"phone_number": form_data["From"]})
-            owner_id = owner_data.get("owner_id")
+            owner_id = owner_data.get("_id")
+            await warung.update_one({"owner_id": owner_id}, {
+                "$set": {
+                    "latitude": latitude,
+                    "longitude": longitude
+                }
+            })
+            
             await owner.update_one({"phone_number": form_data["From"]}, {
                 "$set": {
                     "state": "MENU"
                     }
                 })
 
-            await warung.update_one({"owner_id": owner_id}, {
-                "$set": {
-                    "latitude": latitude, 
-                    "longitude": longitude
-                    }
-                })
-
             send_message(form_data["From"], Messages.REG_TIPE_MSG())
-        except Exception:
+        except Exception as e:
+            print(e)
             send_message(form_data["From"], Messages.EXCEPTION_REG_LOCATION_MSG)
-    
     elif state == State.TIPE_WARUNG.value:
         try:
             if form_data["Body"] in ['A', 'B', 'C', 'D']:
