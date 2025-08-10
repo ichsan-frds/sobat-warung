@@ -1,0 +1,7 @@
+from enum import Enum
+
+class State(Enum):
+    WAITING_FOR_NAME = "WAITING_FOR_NAME"
+    INPUT_NAMA_WARUNG = "INPUT_NAMA_WARUNG"
+    INPUT_LOKASI_WARUNG = "INPUT_LOKASI_WARUNG"
+    MENU = "MENU"
