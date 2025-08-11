@@ -63,16 +63,16 @@ async def whatsapp_webhook(request: Request):
 
             owner_data = await owner.find_one({"phone_number": form_data["From"]})
             owner_id = owner_data.get("_id")
-            await owner.update_one({"phone_number": form_data["From"]}, {
-                "$set": {
-                    "state": "INPUT_WILAYAH_WARUNG"
-                    }
-                })
-
             await warung.insert_one({
                 "warung_name": warung_name,
                 "owner_id": owner_id,
             })
+
+            await owner.update_one({"phone_number": form_data["From"]}, {
+                "$set": {
+                    "state": State.INPUT_WILAYAH_WARUNG.value
+                    }
+                })
 
             send_message(form_data["From"], Messages.REG_WILAYAH_MSG(warung_name))
         except Exception:
@@ -103,14 +103,22 @@ async def whatsapp_webhook(request: Request):
                 
             owner_data = await owner.find_one({"phone_number": form_data["From"]})
             owner_id = owner_data.get("_id")
-            await owner.update_one({"phone_number": form_data["From"]}, {"$set": {"state": "INPUT_LOKASI_WARUNG"}})
 
-            await warung.update_one({"owner_id": owner_id},
-                                    {"$set": {"desa/kelurahan": desa_kel, 
-                                            "kecamatan": kecamatan,
-                                            "kota/kabupaten": kota_kab,
-                                            "provinsi": provinsi}})
+            await warung.update_one({"owner_id": owner_id},{
+                "$set": {
+                    "desa/kelurahan": desa_kel, 
+                    "kecamatan": kecamatan,
+                    "kota/kabupaten": kota_kab,
+                    "provinsi": provinsi
+                    }
+                })
                 
+            await owner.update_one({"phone_number": form_data["From"]}, {
+                "$set": {
+                    "state": State.INPUT_LOKASI_WARUNG.value
+                    }
+                })
+            
             send_message(form_data["From"], Messages.REG_LOCATION_MSG())
         except Exception:
             send_message(form_data["From"], Messages.EXCEPTION_REG_WILAYAH_MSG)
@@ -143,24 +151,33 @@ async def whatsapp_webhook(request: Request):
             
             await owner.update_one({"phone_number": form_data["From"]}, {
                 "$set": {
-                    "state": "MENU"
+                    "state": State.TIPE_WARUNG.value
                     }
                 })
 
             send_message(form_data["From"], Messages.REG_TIPE_MSG())
         except Exception as e:
-            print(e)
+            print("Error :", e)
             send_message(form_data["From"], Messages.EXCEPTION_REG_LOCATION_MSG)
+
     elif state == State.TIPE_WARUNG.value:
         try:
             if form_data["Body"] in ['A', 'B', 'C', 'D']:
                 owner_data = await owner.find_one({"phone_number": form_data["From"]})
                 owner_id = owner_data.get("_id")
                 owner_name = owner_data.get("owner_name", "Sobat Warung")
-                await owner.update_one({"phone_number": form_data["From"]}, {"$set": {"state": "MENU"}})
-
-                await warung.update_one({"owner_id": owner_id},{"$set": {"type": form_data["Body"]}})
+                await warung.update_one({"owner_id": owner_id},{
+                    "$set": {
+                        "type": form_data["Body"]
+                        }
+                    })
                 
+                await owner.update_one({"phone_number": form_data["From"]}, {
+                    "$set": {
+                        "state": State.MENU.value
+                        }
+                    })
+
             else:
                 raise HTTPException(
                     status_code=400, detail="Format tidak sesuai")
