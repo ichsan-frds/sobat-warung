@@ -3,7 +3,10 @@ from api.core.twilio import client
 import os
 from api.misc.messages import Messages
 from api.misc.states import State
-from api.core.database import owner, warung, stock
+from api.misc.aggregate import Aggregate
+from api.misc.utils import find_similar_product
+from api.core.database import owner, warung, stock, product
+from datetime import datetime
 
 router = APIRouter()
 
@@ -189,7 +192,10 @@ async def whatsapp_webhook(request: Request):
         if form_data["Body"] == '1': 
             send_message(form_data["From"], Messages.MENU_1_MSG())
         elif "Terjual :" in form_data["Body"]:
-            pass
+            try:
+                pass
+            except Exception:
+                send_message(form_data["From"], Messages.EXCEPTION_MENU_1_MSG)
         
         elif form_data["Body"] == '2':
             # Panggil Function Predict Model Forecast
@@ -197,27 +203,67 @@ async def whatsapp_webhook(request: Request):
         
         elif form_data["Body"] == '3':
             # IF TOKO SUDAH INPUT STOK, FETCH STOK DARI DATABASE
-            owner_data = await owner.find_one({"phone_number": form_data["From"]})
-            owner_id = owner_data.get("_id")
-            warung_data = await warung.find_one({"owner_id": owner_id})
-            warung_id = warung_data.get("_id")
-            stock_data = (await stock.find({"warung_id": warung_id}) or {}).get()
-            pass
+            pipeline = Aggregate.get_stock_by_phone_pipeline(form_data["From"])
+            cursor = await owner.aggregate(pipeline)
+            results = await cursor.to_list(length=None)
 
             # ELSE, SURUH TOKO INPUT STOK TERLEBIH DAHULU
-            
-            # Pilihan 1 : Input lewat WA (dikasi format)
-            # Pilihan 2 : Input lewat GForms (dikasi link)
+            if not results:
+                await owner.update_one({"phone_number": form_data["From"]}, {
+                    "$set": {
+                        "state": State.INPUT_STOK.value
+                        }
+                    })
+                
+                send_message(form_data["From"], Messages.MENU_3_INPUT_STOK_MSG)
+            else:
+                stock_list = "\n".join(
+                    f"{item['product_name']}, {item['stock_count']}, {item['price']}"
+                    for item in results
+                )
 
-            # UNCOMMENT KALAU INGIN MENGIRIM PESAN DARI BOT KE USER ($0.01 / msg)
-            message = client.messages.create(
-                    to = form_data["From"],
-                    from_ = os.getenv("FROM_WA_NUMBER"),
-                    body =
-                    """Silahkan input Stok barang toko anda
-Ketik dengan format: *Barang, jumlah, harga; Barang, jumlah, harga; ...*
-Contoh: *Indomie, 10, 3000; Teh Gelas, 5, 1000*"""
-)
+                send_message(form_data["From"], Messages.MENU_3_CEK_STOK_MSG(stock_list))
         else:
             owner_name = (await owner.find_one({"phone_number": form_data["From"]}) or {}).get("owner_name", "Sobat Warung")
             send_message(form_data["From"], Messages.MENU_MSG(owner_name))
+
+    elif state == State.INPUT_STOK.value:
+        try:
+            owner_data = await owner.find_one({"phone_number": form_data["From"]})
+            warung_data = await warung.find_one({"owner_id": owner_data["_id"]})
+            warung_id = warung_data["_id"]
+
+            lines = form_data["Body"].split("\n")
+            for line in lines:
+                parts = line.split(",")
+                if len(parts) != 3:
+                    raise HTTPException(
+                        status_code=400, detail="Format tidak sesuai")
+                
+                product_name = parts[0].strip()
+                stock_count = int(parts[1].strip())
+                price = int(parts[2].strip())
+
+                product_data = await find_similar_product(product_name)
+                if not product_data:
+                    insert_result = await product.insert_one({"product_name": product_name})
+                    product_id = insert_result.inserted_id
+                else:
+                    product_id = product_data["_id"]
+                
+                await stock.update_one(
+                    {"warung_id": warung_id, "product_id": product_id},
+                    {"$set": {"stock_count": stock_count, "price": price, "last_transaction": datetime.now()}},
+                    upsert=True
+                )
+
+                await owner.update_one({"phone_number": form_data["From"]}, {
+                    "$set": {
+                        "state": State.MENU.value
+                        }
+                })
+                owner_data = await owner.find_one({"phone_number": form_data["From"]})
+                owner_name = owner_data.get("owner_name", "Sobat Warung")
+                send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_data["owner_name"]))
+        except Exception:
+            send_message(form_data["From"], Messages.EXCEPTION_MENU_3_INPUT_STOK_MSG)
