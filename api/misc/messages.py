@@ -73,15 +73,25 @@ Balas *angka* untuk pilih menu berikut :
     
     MENU_1_MSG = """Apa saja yang terjual hari ini?  
 Ketik dengan format: 
-*Terjual : Barang, jumlah; Barang, jumlah; ...*  
+*Terjual : Barang1, jumlah1, harga1* 
+*Barang2, jumlah2, harga2*
 Contoh: 
-*Terjual : Indomie, 10; Teh Gelas, 5*"""
+*Terjual : Indomie Goreng, 10, 3000*
+*Indomie Kari Ayam, 15, 3000*
+
+❗Tulis setiap informasi di baris baru (tekan *Enter*
+atau *Shift+Enter* di PC/Laptop)"""
 
     EXCEPTION_MENU_1_MSG = """Format salah!
 Ketik dengan format: 
-*Terjual : Barang, jumlah; Barang, jumlah; ...*  
+*Terjual : Barang1, jumlah1, harga1* 
+*Barang2, jumlah2, harga2*
 Contoh: 
-*Terjual : Indomie, 10; Teh Gelas, 5*"""
+*Terjual : Indomie Goreng, 10, 3000*
+*Indomie Kari Ayam, 15, 3000*
+
+❗Tulis setiap informasi di baris baru (tekan *Enter*
+atau *Shift+Enter* di PC/Laptop)"""
 
     def MENU_3_CEK_STOK_MSG(stock_list: str):
         return f"""*Nama Barang*, *Stok Barang*, *Harga Barang*

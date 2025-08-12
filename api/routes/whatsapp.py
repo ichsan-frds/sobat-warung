@@ -5,7 +5,7 @@ from api.misc.messages import Messages
 from api.misc.states import State
 from api.misc.aggregate import Aggregate
 from api.misc.utils import find_similar_product
-from api.core.database import owner, warung, stock, product
+from api.core.database import owner, warung, stock, product, transaction
 from datetime import datetime
 
 router = APIRouter()
@@ -190,10 +190,64 @@ async def whatsapp_webhook(request: Request):
 
     elif state == State.MENU.value:
         if form_data["Body"] == '1': 
-            send_message(form_data["From"], Messages.MENU_1_MSG())
+            send_message(form_data["From"], Messages.MENU_1_MSG)
         elif "Terjual :" in form_data["Body"]:
             try:
-                pass
+                lines = form_data["Body"].strip().split("\n")
+
+                try:
+                    _, first_data = lines[0].split(":", 1)
+                    first_data = first_data.strip()
+                except ValueError:
+                    raise HTTPException(status_code=400, detail="Format tidak sesuai")
+                
+                owner_data = await owner.find_one({"phone_number": form_data["From"]})
+                warung_data = await warung.find_one({"owner_id": owner_data["_id"]})
+                warung_id = warung_data["_id"]
+
+                product_lines = [first_data.strip()] + lines[1:]
+                    
+                for line in product_lines:
+                    parts = [p.strip() for p in line.split(",")]
+                    if len(parts) != 2:
+                        raise HTTPException(status_code=400, detail=f"Format tidak sesuai: {line}")
+
+                    product_name = parts[0]
+                    quantity_sold = int(parts[1])
+
+                    product_data = await find_similar_product(product_name)
+                    if not product_data:
+                        raise HTTPException(status_code=404, detail=f"Produk '{name}' tidak ditemukan")
+                    else:
+                        product_id = product_data["_id"]
+
+                    stock_data = await stock.find_one({"warung_id": warung_id, "product_id": product_id})
+                    if not stock_data:
+                        raise HTTPException(status_code=404, detail=f"Stok produk '{product_data['product_name']}' tidak ditemukan")
+                    product_price = stock_data["price"]
+
+                    await transaction.insert_one(
+                        {"date": datetime.now(),
+                         "warung_id": warung_id,
+                         "product_id": product_id,
+                         "quantity_sold": quantity_sold,
+                         "total_price": quantity_sold * product_price}
+                    )
+
+                    await stock.update_one(
+                        {"warung_id": warung_id, "product_id": product_id},
+                        {"$inc": {"stock_count": -quantity_sold, "last_transaction": datetime.now()}}
+                    )
+
+                await owner.update_one({"phone_number": form_data["From"]}, {
+                        "$set": {
+                            "state": State.MENU.value
+                            }
+                    })
+                owner_data = await owner.find_one({"phone_number": form_data["From"]})
+                owner_name = owner_data.get("owner_name", "Sobat Warung")
+                send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_data["owner_name"]))
+
             except Exception:
                 send_message(form_data["From"], Messages.EXCEPTION_MENU_1_MSG)
         
