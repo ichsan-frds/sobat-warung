@@ -119,7 +119,8 @@ Contoh:
 *Indomie Kari Ayam*"""
             
         return f"""{message}
-
+        
+Ketik *Menu* untuk kembali ke menu utama
 ❗Tulis setiap informasi di baris baru (tekan *Enter*
 atau *Shift+Enter* di PC/Laptop)
 """
@@ -151,6 +152,7 @@ Contoh:
         return f"""{error_message}
 ❗Tulis setiap informasi di baris baru (tekan *Enter*
 atau *Shift+Enter* di PC/Laptop)
+Ketik *Menu* untuk kembali ke menu utama
 
 {message}"""
 
@@ -165,12 +167,14 @@ Contoh: *Indomie Goreng, 10, 3000*
 *Aqua 1.5 L, 20, 8000*
 *Aqua Gelas 1 Dus, 5, 45000*
 
+Ketik *Menu* untuk kembali ke menu utama
 ❗Tulis setiap informasi di baris baru (tekan *Enter*
 atau *Shift+Enter* di PC/Laptop)"""
 
     EXCEPTION_MENU_3_INPUT_STOK_MSG = """Format salah!
 ❗Tulis setiap informasi di baris baru (tekan *Enter*
 atau *Shift+Enter* di PC/Laptop)
+Ketik *Menu* untuk kembali ke menu utama
 
 Contoh: *Indomie Goreng, 10, 3000*
 *Indomie Kari Ayam, 15, 3000*
