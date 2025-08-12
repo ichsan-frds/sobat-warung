@@ -206,6 +206,7 @@ async def whatsapp_webhook(request: Request):
             pipeline = Aggregate.get_stock_by_phone_pipeline(form_data["From"])
             cursor = await owner.aggregate(pipeline)
             results = await cursor.to_list(length=None)
+            print("Results:", results)  # UNCOMMENT DI PRODUCTION
 
             # ELSE, SURUH TOKO INPUT STOK TERLEBIH DAHULU
             if not results:
@@ -223,9 +224,99 @@ async def whatsapp_webhook(request: Request):
                 )
 
                 send_message(form_data["From"], Messages.MENU_3_CEK_STOK_MSG(stock_list))
+                send_message(form_data["From"], Messages.CEK_STOK_CHOICES_MSG)
+
+        elif form_data["Body"] in ['Tambah', 'Update', 'Hapus']:
+            await owner.update_one({"phone_number": form_data["From"]}, {
+                    "$set": {
+                        "state": State.EDIT_STOK.value
+                        }
+                    })
+            send_message(form_data["From"], Messages.MENU_3_EDIT_STOK_MSG(form_data["Body"]))
+
         else:
             owner_name = (await owner.find_one({"phone_number": form_data["From"]}) or {}).get("owner_name", "Sobat Warung")
             send_message(form_data["From"], Messages.MENU_MSG(owner_name))
+
+    elif state == State.EDIT_STOK.value:
+        try:
+            lines = form_data["Body"].strip().split("\n")
+            edit_type = None
+
+            # Ambil edit_type & first_data dari baris pertama
+            try:
+                edit_type, first_data = lines[0].split(":", 1)
+                edit_type = edit_type.strip()
+                first_data = first_data.strip()
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Format tidak sesuai")
+
+            # Validasi edit_type
+            if edit_type not in ["Tambah", "Update", "Hapus"]:
+                raise HTTPException(status_code=400, detail="Format tidak sesuai")
+
+            owner_data = await owner.find_one({"phone_number": form_data["From"]})
+            warung_data = await warung.find_one({"owner_id": owner_data["_id"]})
+            warung_id = warung_data["_id"]
+            
+            if edit_type in ["Tambah", "Update"]:
+                # Gabungkan ulang data produk (baris pertama tanpa edit_type + baris lainnya)
+                product_lines = [first_data.strip()] + lines[1:]
+                
+                for line in product_lines:
+                    parts = [p.strip() for p in line.split(",")]
+                    if len(parts) != 3:
+                        raise HTTPException(status_code=400, detail=f"Format tidak sesuai: {line}")
+
+                    product_name = parts[0]
+                    stock_count = int(parts[1])
+                    price = int(parts[2])
+
+                    product_data = await find_similar_product(product_name)
+                    if not product_data:
+                        insert_result = await product.insert_one({"product_name": product_name})
+                        product_id = insert_result.inserted_id
+                    else:
+                        product_id = product_data["_id"]
+
+                    await stock.update_one(
+                        {"warung_id": warung_id, "product_id": product_id},
+                        {"$set": {"stock_count": stock_count, "price": price, "last_transaction": datetime.now()}},
+                        upsert=True
+                    )
+            else:
+                # Ambil semua produk (baris pertama tanpa edit_type + baris berikutnya)
+                product_names = [first_data.strip()] + [line.strip() for line in lines[1:]]
+
+                for name in product_names:
+                    if not name:  # kalau kosong
+                        raise HTTPException(status_code=400, detail=f"Format tidak sesuai: {name}")
+
+                    product_data = await find_similar_product(name)
+                    if not product_data:
+                        raise HTTPException(status_code=404, detail=f"Produk '{name}' tidak ditemukan")
+                    else:
+                        product_id = product_data["_id"]
+
+                    await stock.delete_one({"warung_id": warung_id, "product_id": product_id})
+
+            await owner.update_one({"phone_number": form_data["From"]}, {
+                    "$set": {
+                        "state": State.MENU.value
+                        }
+                })
+            owner_data = await owner.find_one({"phone_number": form_data["From"]})
+            owner_name = owner_data.get("owner_name", "Sobat Warung")
+            send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_data["owner_name"]))
+            
+        except HTTPException as e:
+            if e.status_code == 404:
+                send_message(form_data["From"], Messages.EXCEPTION_MENU_3_EDIT_STOK_MSG(edit_type, e.status_code))
+            else:
+                send_message(form_data["From"], Messages.EXCEPTION_MENU_3_EDIT_STOK_MSG(edit_type))
+
+        except Exception:
+            send_message(form_data["From"], Messages.EXCEPTION_MENU_3_EDIT_STOK_MSG(edit_type))
 
     elif state == State.INPUT_STOK.value:
         try:

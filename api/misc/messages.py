@@ -72,17 +72,87 @@ Balas *angka* untuk pilih menu berikut :
 3. Cek Stok Warung"""
     
     MENU_1_MSG = """Apa saja yang terjual hari ini?  
-Ketik dengan format: *Terjual : Barang, jumlah; Barang, jumlah; ...*  
-Contoh: *Terjual : Indomie, 10; Teh Gelas, 5*"""
+Ketik dengan format: 
+*Terjual : Barang, jumlah; Barang, jumlah; ...*  
+Contoh: 
+*Terjual : Indomie, 10; Teh Gelas, 5*"""
 
     EXCEPTION_MENU_1_MSG = """Format salah!
-Ketik dengan format: *Terjual : Barang, jumlah; Barang, jumlah; ...*  
-Contoh: *Terjual : Indomie, 10; Teh Gelas, 5*"""
+Ketik dengan format: 
+*Terjual : Barang, jumlah; Barang, jumlah; ...*  
+Contoh: 
+*Terjual : Indomie, 10; Teh Gelas, 5*"""
 
     def MENU_3_CEK_STOK_MSG(stock_list: str):
-        return f"""[Nama Barang], [Stok Barang], [Harga Barang]
+        return f"""*Nama Barang*, *Stok Barang*, *Harga Barang*
+
 {stock_list}
 """
+    
+    CEK_STOK_CHOICES_MSG = """
+Tambah Barang   -> Ketik *Tambah*
+(Menambah Barang yang belum ada di stok)
+Update Barang   -> Ketik *Update*
+(Memperbaharui nama, jumlah stok, atau harga barang)
+Hapus Barang    -> Ketik *Hapus*
+(Menghapus Barang yang ada di stok)
+Menu Utama      -> Ketik *Menu*
+"""
+
+    def MENU_3_EDIT_STOK_MSG(edit_type: str):
+        if edit_type in ["Tambah", "Update"]:
+            message = f"""*{edit_type} Barang*
+Ketik dengan format: 
+*{edit_type} : Barang1, jumlah1, harga1* 
+*Barang2, jumlah2, harga2*
+Contoh: 
+*{edit_type} : Indomie Goreng, 10, 3000*
+*Indomie Kari Ayam, 15, 3000*"""
+        
+        else:
+            message = f"""*{edit_type} Barang*
+Ketik dengan format: 
+*{edit_type} : Barang1* 
+*Barang2*
+Contoh: 
+*{edit_type} : Indomie Goreng*
+*Indomie Kari Ayam*"""
+            
+        return f"""{message}
+
+❗Tulis setiap informasi di baris baru (tekan *Enter*
+atau *Shift+Enter* di PC/Laptop)
+"""
+    
+    def EXCEPTION_MENU_3_EDIT_STOK_MSG(edit_type: str, error_status_code: int = 400):
+        if edit_type in ["Tambah", "Update"]:
+            message = f"""*{edit_type} Barang*
+Ketik dengan format: 
+*{edit_type} : Barang1, jumlah1, harga1* 
+*Barang2, jumlah2, harga2*
+Contoh: 
+*{edit_type} : Indomie Goreng, 10, 3000*
+*Indomie Kari Ayam, 15, 3000*"""
+        
+        else:
+            message = f"""*{edit_type} Barang*
+Ketik dengan format: 
+*{edit_type} : Barang1* 
+*Barang2*
+Contoh: 
+*{edit_type} : Indomie Goreng*
+*Indomie Kari Ayam*"""
+            
+        if error_status_code == 404:
+            error_message = "Barang yang ingin dihapus tidak ditemukan!"
+        else:
+            error_message = "Format salah!"
+
+        return f"""{error_message}
+❗Tulis setiap informasi di baris baru (tekan *Enter*
+atau *Shift+Enter* di PC/Laptop)
+
+{message}"""
 
     MENU_3_INPUT_STOK_MSG = """Silahkan input Stok barang toko anda
 Ketik dengan format: *Barang1, jumlah1, harga1* 

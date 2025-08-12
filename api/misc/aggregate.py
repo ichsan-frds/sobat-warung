@@ -22,19 +22,22 @@ class Aggregate():
             }},
             {"$unwind": "$stock_data"},
             
-            # 4. Join ke products
+            # 4. Join ke product
             {"$lookup": {
-                "from": "products",
+                "from": "product",
                 "localField": "stock_data.product_id",
                 "foreignField": "_id",
                 "as": "product_data"
             }},
             {"$unwind": "$product_data"},
             
-            # 5. Pilih field
+            # 5. Sort berdasarkan product_name ascending (A-Z)
+            {"$sort": {"product_data.product_name": 1}},
+            
+            # 6. Pilih field
             {"$project": {
                 "_id": 0,
-                "product_name": "$product_data.name",
+                "product_name": "$product_data.product_name",
                 "stock_count": "$stock_data.stock_count",
                 "price": "$stock_data.price"
             }}
