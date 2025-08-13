@@ -160,7 +160,6 @@ async def whatsapp_webhook(request: Request):
 
             send_message(form_data["From"], Messages.REG_TIPE_MSG())
         except Exception as e:
-            print("Error :", e)
             send_message(form_data["From"], Messages.EXCEPTION_REG_LOCATION_MSG)
 
     elif state == State.TIPE_WARUNG.value:
@@ -224,6 +223,13 @@ async def whatsapp_webhook(request: Request):
                     stock_data = await stock.find_one({"warung_id": warung_id, "product_id": product_id})
                     if not stock_data:
                         raise HTTPException(status_code=404, detail=f"Stok produk '{product_data['product_name']}' tidak ditemukan")
+                    if quantity_sold > stock_data["stock_count"]:
+                        raise HTTPException(
+                            status_code=404,
+                            detail=(
+                                f"Stok {product_data['product_name']} kurang (tersedia {stock_data['stock_count']})"
+                            )
+                        )
                     product_price = stock_data["price"]
 
                     await transaction.insert_one(
@@ -236,20 +242,24 @@ async def whatsapp_webhook(request: Request):
 
                     await stock.update_one(
                         {"warung_id": warung_id, "product_id": product_id},
-                        {"$inc": {"stock_count": -quantity_sold, "last_transaction": datetime.now()}}
+                        {
+                            "$inc": {"stock_count": -quantity_sold},
+                            "$set": {"last_transaction": datetime.now()}
+                        }
                     )
 
-                await owner.update_one({"phone_number": form_data["From"]}, {
-                        "$set": {
-                            "state": State.MENU.value
-                            }
-                    })
                 owner_data = await owner.find_one({"phone_number": form_data["From"]})
                 owner_name = owner_data.get("owner_name", "Sobat Warung")
                 send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_data["owner_name"]))
 
+            except HTTPException as e:
+                if e.status_code == 404:
+                    send_message(form_data["From"], Messages.EXCEPTION_MENU_1_MSG(e.status_code, e.detail))
+                else:
+                    send_message(form_data["From"], Messages.EXCEPTION_MENU_1_MSG())
+
             except Exception:
-                send_message(form_data["From"], Messages.EXCEPTION_MENU_1_MSG)
+                send_message(form_data["From"], Messages.EXCEPTION_MENU_1_MSG())
         
         elif form_data["Body"] == '2':
             # Panggil Function Predict Model Forecast
@@ -260,7 +270,6 @@ async def whatsapp_webhook(request: Request):
             pipeline = Aggregate.get_stock_by_phone_pipeline(form_data["From"])
             cursor = await owner.aggregate(pipeline)
             results = await cursor.to_list(length=None)
-            print("Results:", results)  # UNCOMMENT DI PRODUCTION
 
             # ELSE, SURUH TOKO INPUT STOK TERLEBIH DAHULU
             if not results:
@@ -381,7 +390,7 @@ async def whatsapp_webhook(request: Request):
                 
             except HTTPException as e:
                 if e.status_code == 404:
-                    send_message(form_data["From"], Messages.EXCEPTION_MENU_3_EDIT_STOK_MSG(edit_type, e.status_code))
+                    send_message(form_data["From"], Messages.EXCEPTION_MENU_3_EDIT_STOK_MSG(edit_type, e.status_code, e.detail))
                 else:
                     send_message(form_data["From"], Messages.EXCEPTION_MENU_3_EDIT_STOK_MSG(edit_type))
 

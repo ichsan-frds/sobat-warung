@@ -73,25 +73,28 @@ Balas *angka* untuk pilih menu berikut :
     
     MENU_1_MSG = """Apa saja yang terjual hari ini?  
 Ketik dengan format: 
-*Terjual : Barang1, jumlah1, harga1* 
-*Barang2, jumlah2, harga2*
+*Terjual : Barang1, jumlah1* 
+*Barang2, jumlah2*
 Contoh: 
-*Terjual : Indomie Goreng, 10, 3000*
-*Indomie Kari Ayam, 15, 3000*
+*Terjual : Indomie Goreng, 10*
+*Indomie Kari Ayam, 15*
 
+Ketik *Menu* untuk kembali ke menu utama
 ❗Tulis setiap informasi di baris baru (tekan *Enter*
 atau *Shift+Enter* di PC/Laptop)"""
 
-    EXCEPTION_MENU_1_MSG = """Format salah!
+    def EXCEPTION_MENU_1_MSG(error_status_code: int = 400, error_message: str = "Format salah!"):
+        return f"""{error_message}
+❗Tulis setiap informasi di baris baru (tekan *Enter*
+atau *Shift+Enter* di PC/Laptop)
+Ketik *Menu* untuk kembali ke menu utama
+
 Ketik dengan format: 
-*Terjual : Barang1, jumlah1, harga1* 
-*Barang2, jumlah2, harga2*
+*Terjual : Barang1, jumlah1* 
+*Barang2, jumlah2*
 Contoh: 
-*Terjual : Indomie Goreng, 10, 3000*
-*Indomie Kari Ayam, 15, 3000*
-
-❗Tulis setiap informasi di baris baru (tekan *Enter*
-atau *Shift+Enter* di PC/Laptop)"""
+*Terjual : Indomie Goreng, 10*
+*Indomie Kari Ayam, 15*"""
 
     def MENU_3_CEK_STOK_MSG(stock_list: str):
         return f"""*Nama Barang*, *Stok Barang*, *Harga Barang*
@@ -135,7 +138,7 @@ Ketik *Menu* untuk kembali ke menu utama
 atau *Shift+Enter* di PC/Laptop)
 """
     
-    def EXCEPTION_MENU_3_EDIT_STOK_MSG(edit_type: str, error_status_code: int = 400):
+    def EXCEPTION_MENU_3_EDIT_STOK_MSG(edit_type: str, error_status_code: int = 400, error_message: str = "Format salah!"):
         if edit_type in ["Tambah", "Update"]:
             message = f"""*{edit_type} Barang*
 Ketik dengan format: 
@@ -153,11 +156,6 @@ Ketik dengan format:
 Contoh: 
 *{edit_type} : Indomie Goreng*
 *Indomie Kari Ayam*"""
-            
-        if error_status_code == 404:
-            error_message = "Barang yang ingin dihapus tidak ditemukan!"
-        else:
-            error_message = "Format salah!"
 
         return f"""{error_message}
 ❗Tulis setiap informasi di baris baru (tekan *Enter*
