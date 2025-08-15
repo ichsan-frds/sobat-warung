@@ -200,7 +200,7 @@ Balas *angka* untuk pilih menu berikut :
     
     def COLLECTIVE_BUYING_MSG(unique_owner_ids: list[str], produk_str: str, harga_setelah_diskon: int):
         return f"""Peringatan! 
-{len(unique_owner_ids) - 1} warung di sekitar Anda juga butuh {produk_str}.
+{len(unique_owner_ids)} warung di sekitar Anda juga butuh {produk_str}.
 Beli bersama dan hemat 12%. Harga kolektif: Rp {harga_setelah_diskon:,}.
 Mau ikut?
 Iya -> Ketik *Ya*

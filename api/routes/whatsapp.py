@@ -540,16 +540,19 @@ async def send_collective_buying_message():
             for owner_id in unique_owner_ids:
                 owner_data = await owner.find_one({"_id": owner_id})
                 if not owner_data:
-                    continue
+                    raise HTTPException(
+                        status_code=404, detail=f"Owner with ID {owner_id} not found"
+                    )
 
                 phone_number = owner_data.get("phone_number")
                 if not phone_number:
-                    continue
+                    raise HTTPException(
+                        status_code=404, detail=f"Owner with ID {owner_id} has no phone number"
+                    )
 
                 # Format produk jadi string dipisah koma
                 produk_str = ", ".join(product_names)
 
-                # Kirim pesan via WhatsApp API / Twilio / pywa
                 send_message(phone_number, Messages.COLLECTIVE_BUYING_MSG(
                     unique_owner_ids=unique_owner_ids,
                     produk_str=produk_str,
