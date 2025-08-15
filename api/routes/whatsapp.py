@@ -50,7 +50,8 @@ async def whatsapp_webhook(request: Request):
                 })
 
             send_message(form_data["From"], Messages.REG_WARUNG_MSG(owner_name))
-        except Exception:
+        except Exception as e:
+            print(e)
             send_message(form_data["From"], Messages.EXCEPTION_WELCOME_MSG)
     
     elif state == State.INPUT_NAMA_WARUNG.value:
@@ -78,7 +79,8 @@ async def whatsapp_webhook(request: Request):
                 })
 
             send_message(form_data["From"], Messages.REG_WILAYAH_MSG(warung_name))
-        except Exception:
+        except Exception as e:
+            print(e)
             send_message(form_data["From"], Messages.EXCEPTION_REG_WARUNG_MSG)
     
     elif state == State.INPUT_WILAYAH_WARUNG.value:
@@ -122,8 +124,9 @@ async def whatsapp_webhook(request: Request):
                     }
                 })
             
-            send_message(form_data["From"], Messages.REG_LOCATION_MSG())
-        except Exception:
+            send_message(form_data["From"], Messages.REG_LOCATION_MSG)
+        except Exception as e:
+            print(e)
             send_message(form_data["From"], Messages.EXCEPTION_REG_WILAYAH_MSG)
 
     elif state == State.INPUT_LOKASI_WARUNG.value:  
@@ -131,7 +134,7 @@ async def whatsapp_webhook(request: Request):
             if form_data["MessageType"] == "location":
                 latitude = form_data["Latitude"]
                 longitude = form_data["Longitude"]
-            elif "Latitude :" in form_data["Body"]:
+            elif "Latitude :" in form_data["Body"] and "Longitude :" in form_data["Body"]:
                 latitude = form_data["Body"].split("Latitude :")[1].split(",")[0].strip()
                 longitude = form_data["Body"].split("Longitude :")[1].strip()
             else:
@@ -158,8 +161,9 @@ async def whatsapp_webhook(request: Request):
                     }
                 })
 
-            send_message(form_data["From"], Messages.REG_TIPE_MSG())
+            send_message(form_data["From"], Messages.REG_TIPE_MSG)
         except Exception as e:
+            print(e)
             send_message(form_data["From"], Messages.EXCEPTION_REG_LOCATION_MSG)
 
     elif state == State.TIPE_WARUNG.value:
@@ -171,7 +175,7 @@ async def whatsapp_webhook(request: Request):
                 await warung.update_one({"owner_id": owner_id},{
                     "$set": {
                         "type": form_data["Body"]
-                        }
+                        }   
                     })
                 
                 await owner.update_one({"phone_number": form_data["From"]}, {
@@ -184,7 +188,8 @@ async def whatsapp_webhook(request: Request):
                 raise HTTPException(
                     status_code=400, detail="Format tidak sesuai")
             send_message(form_data["From"], Messages.MENU_MSG(owner_name))
-        except Exception:
+        except Exception as e:
+            print(e)
             send_message(form_data["From"], Messages.EXCEPTION_REG_TIPE_MSG)
 
     elif state == State.MENU.value:
@@ -233,11 +238,13 @@ async def whatsapp_webhook(request: Request):
                     product_price = stock_data["price"]
 
                     await transaction.insert_one(
-                        {"date": datetime.now(),
-                         "warung_id": warung_id,
-                         "product_id": product_id,
-                         "quantity_sold": quantity_sold,
-                         "total_price": quantity_sold * product_price}
+                        {
+                            "date": datetime.now(),
+                            "warung_id": warung_id,
+                            "product_id": product_id,
+                            "quantity_sold": quantity_sold,
+                            "total_price": quantity_sold * product_price
+                        }
                     )
 
                     await stock.update_one(
@@ -256,14 +263,24 @@ async def whatsapp_webhook(request: Request):
                 if e.status_code == 404:
                     send_message(form_data["From"], Messages.EXCEPTION_MENU_1_MSG(e.status_code, e.detail))
                 else:
+                    print(e)
                     send_message(form_data["From"], Messages.EXCEPTION_MENU_1_MSG())
-
-            except Exception:
-                send_message(form_data["From"], Messages.EXCEPTION_MENU_1_MSG())
         
         elif form_data["Body"] == '2':
-            # Panggil Function Predict Model Forecast
-            pass 
+            today_transactions = transaction.find({"date": datetime.now()})
+
+            # IF ada, panggil function predict dari model forecast
+            # Hasil predict dimasukin ke collection forecast
+            # Tampilin insight harus restock berapa, kasih juga info kenapa insight ini didapat (Pake text builder???)
+            # Contoh: Karena besok hari kemerdekaan, stock Teh Botol 15, Teh Kotak 10, dan Pocari 12
+            if today_transactions:
+                for item in today_transactions:
+                    print(item.get("product_id"))
+                print(today_transactions)
+            # ELSE, suruh owner input dulu data transaksi hari ini
+            else:
+                
+                print(today_transactions)
         
         elif form_data["Body"] == '3':
             # IF TOKO SUDAH INPUT STOK, FETCH STOK DARI DATABASE
@@ -392,10 +409,8 @@ async def whatsapp_webhook(request: Request):
                 if e.status_code == 404:
                     send_message(form_data["From"], Messages.EXCEPTION_MENU_3_EDIT_STOK_MSG(edit_type, e.status_code, e.detail))
                 else:
+                    print(e)
                     send_message(form_data["From"], Messages.EXCEPTION_MENU_3_EDIT_STOK_MSG(edit_type))
-
-            except Exception:
-                send_message(form_data["From"], Messages.EXCEPTION_MENU_3_EDIT_STOK_MSG(edit_type))
 
     elif state == State.INPUT_STOK.value:
         if form_data["Body"] == 'Menu':
@@ -443,6 +458,8 @@ async def whatsapp_webhook(request: Request):
                     })
                     owner_data = await owner.find_one({"phone_number": form_data["From"]})
                     owner_name = owner_data.get("owner_name", "Sobat Warung")
-                    send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_data["owner_name"]))
-            except Exception:
+                    
+                send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_data["owner_name"]))
+            except Exception as e:
+                print(e)
                 send_message(form_data["From"], Messages.EXCEPTION_MENU_3_INPUT_STOK_MSG)
