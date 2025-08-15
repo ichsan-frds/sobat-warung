@@ -23,3 +23,13 @@ async def find_similar_product(product_name: str, threshold: int = 75):
     
     print(f"No similar product found for '{product_name}' with threshold {threshold} because match score is {match[1] if match else 'None'}")
     return None
+
+def predict_demand(transactions):
+    preds = []
+    for t in transactions:
+        preds.append({
+            "product_id": t["product_id"],
+            "predicted_sell": int(t["quantity_sold"]) + 4
+        })
+    
+    return preds

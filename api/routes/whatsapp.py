@@ -4,9 +4,9 @@ import os
 from api.misc.messages import Messages
 from api.misc.states import State
 from api.misc.aggregate import Aggregate
-from api.misc.utils import find_similar_product
-from api.core.database import owner, warung, stock, product, transaction
-from datetime import datetime
+from api.misc.utils import find_similar_product, predict_demand
+from api.core.database import owner, warung, stock, product, transaction, forecast
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -267,20 +267,49 @@ async def whatsapp_webhook(request: Request):
                     send_message(form_data["From"], Messages.EXCEPTION_MENU_1_MSG())
         
         elif form_data["Body"] == '2':
-            today_transactions = transaction.find({"date": datetime.now()})
+            owner_data = await owner.find_one({"phone_number": form_data["From"]})
+            owner_id = owner_data["_id"]
+            
+            warung_data = await warung.find_one({"owner_id": owner_id})
+            warung_id = warung_data["_id"]
+            
+            today = datetime.now().date()
+            start = datetime.combine(today, datetime.min.time())
+            end = datetime.combine(today + timedelta(days=1), datetime.min.time())
+            
+            today_transactions = await transaction.find({
+                "warung_id": warung_id,
+                "date": {
+                    "$gte": start,
+                    "$lt": end
+                }
+            }).to_list(length=None)
 
             # IF ada, panggil function predict dari model forecast
             # Hasil predict dimasukin ke collection forecast
             # Tampilin insight harus restock berapa, kasih juga info kenapa insight ini didapat (Pake text builder???)
             # Contoh: Karena besok hari kemerdekaan, stock Teh Botol 15, Teh Kotak 10, dan Pocari 12
             if today_transactions:
-                for item in today_transactions:
-                    print(item.get("product_id"))
-                print(today_transactions)
+                forecast_results = predict_demand(today_transactions)
+                
+                for f in forecast_results:
+                    await forecast.insert_one({
+                        "date": datetime.now(),
+                        "warung_id": warung_id,
+                        "product_id": f["product_id"],
+                        "predicted_sell": f["predicted_sell"]
+                    })
+                    
+                insight_text = "Rekomendasi restock:\n"
+                for f in forecast_results:
+                    prod_data = await product.find_one({"_id": f["product_id"]})
+                    prod_name = prod_data["product_name"] if prod_data else "Produk tidak diketahui"
+                    insight_text += f"- {prod_name}: {f['predicted_sell']} pcs\n"
+                
+                send_message(form_data["From"], insight_text.strip())
             # ELSE, suruh owner input dulu data transaksi hari ini
             else:
-                
-                print(today_transactions)
+                send_message(form_data["From"], "Belum ada transaksi hari ini. Silakan input data transaksi terlebih dahulu.")
         
         elif form_data["Body"] == '3':
             # IF TOKO SUDAH INPUT STOK, FETCH STOK DARI DATABASE
