@@ -492,3 +492,68 @@ async def whatsapp_webhook(request: Request):
             except Exception as e:
                 print(e)
                 send_message(form_data["From"], Messages.EXCEPTION_MENU_3_INPUT_STOK_MSG)
+
+@router.post("/send-collective-buying")
+async def send_collective_buying_message():
+    # Ambil distinct key "warung_id" dari collection forecast
+    # Untuk setiap warung_id, ambil key "kecamatan"
+    # Group By Kecamatan lihat barang yang paling dibutuhkan dari collection forecast
+    # Untuk setiap kecamatan dan barang, kirim pesan ke semua warung yang butuh barang di kecamatan tsb (menggunakan key "owner_id", lalu ambil phone_number)
+    try:
+        pipeline = Aggregate.get_forecasted_products_group_by_kecamatan_pipeline(min_stores=1, min_units_per_store=1, dominance_gap_pct=0)
+        cursor = await forecast.aggregate(pipeline)
+        results = await cursor.to_list(length=None)
+        print("results:", results)  # UNCOMMENT DI PRODUCTION
+        
+        # Loop per kecamatan
+        for kecamatan_data in results:
+            products = kecamatan_data.get("products", [])
+            if "top_product" in kecamatan_data:
+                products.append(kecamatan_data["top_product"])
+            if "runner_up" in kecamatan_data:
+                products.append(kecamatan_data["runner_up"])
+
+            # Gabung semua produk jadi satu list
+            product_names = []
+            harga_per_bundle = 0
+            total_units = 0
+            for individual_product in products:
+                product_names.append(individual_product["product_name"])
+                # POTENTIAL N+1 QUERY
+                stock_data = await stock.find_one({"product_id": individual_product["product_id"]})
+                harga_per_bundle = stock_data.get("price", 0)
+                total_units += individual_product.get("total_units", 0)
+
+            harga_kolektif = total_units * harga_per_bundle
+            # Diskon 12%
+            harga_setelah_diskon = round(harga_kolektif * 0.88)
+
+            # Ambil semua warung yang butuh di kecamatan ini
+            all_stores = []
+            for individual_product in products:
+                all_stores.extend(individual_product.get("stores", []))
+
+            # Hilangkan duplikat toko berdasarkan owner_id
+            unique_owner_ids = {store["owner_id"] for store in all_stores}
+
+            # Kirim pesan ke masing-masing toko unik
+            for owner_id in unique_owner_ids:
+                owner_data = await owner.find_one({"_id": owner_id})
+                if not owner_data:
+                    continue
+
+                phone_number = owner_data.get("phone_number")
+                if not phone_number:
+                    continue
+
+                # Format produk jadi string dipisah koma
+                produk_str = ", ".join(product_names)
+
+                # Kirim pesan via WhatsApp API / Twilio / pywa
+                send_message(phone_number, Messages.COLLECTIVE_BUYING_MSG(
+                    unique_owner_ids=unique_owner_ids,
+                    produk_str=produk_str,
+                    harga_setelah_diskon=harga_setelah_diskon
+                ))
+    except Exception as e:
+            print(e)

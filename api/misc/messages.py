@@ -197,3 +197,11 @@ Balas *angka* untuk pilih menu berikut :
 1. Setor Penjualan Hari Ini
 2. Prediksi Permintaan Besok
 3. Cek Stok Warung"""
+    
+    def COLLECTIVE_BUYING_MSG(unique_owner_ids: list[str], produk_str: str, harga_setelah_diskon: int):
+        return f"""Peringatan! 
+{len(unique_owner_ids) - 1} warung di sekitar Anda juga butuh {produk_str}.
+Beli bersama dan hemat 12%. Harga kolektif: Rp {harga_setelah_diskon:,}.
+Mau ikut?
+Iya -> Ketik *Ya*
+Tidak -> Ketik *Tidak*"""

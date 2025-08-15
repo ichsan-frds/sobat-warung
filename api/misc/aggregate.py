@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 class Aggregate():
     def get_stock_by_phone_pipeline(phone_number: str):
         return [
@@ -41,4 +43,144 @@ class Aggregate():
                 "stock_count": "$stock_data.stock_count",
                 "price": "$stock_data.price"
             }}
+        ]
+
+    def get_forecasted_products_group_by_kecamatan_pipeline(
+        min_stores=3,          # Threshold jumlah toko minimal
+        min_units_per_store=5, # Threshold kebutuhan minimal per toko
+        dominance_gap_pct=0.1  # Selisih minimal dominasi produk
+    ):
+        today = datetime.now().date()
+        start = datetime.combine(today, datetime.min.time())
+        end = datetime.combine(today + timedelta(days=1), datetime.min.time())
+
+        return [
+            # 1. Filter forecast hari ini
+            {
+                "$match": {
+                    "date": {
+                        "$gte": start,
+                        "$lt": end
+                    }
+                }
+            },
+
+            # 2. Join forecast + warung
+            {
+                "$lookup": {
+                    "from": "warung",
+                    "localField": "warung_id",
+                    "foreignField": "_id",
+                    "as": "warung_info"
+                }
+            },
+            {"$unwind": "$warung_info"},
+
+            # 3. Filter toko dengan kebutuhan >= min_units_per_store
+            {
+                "$match": {
+                    "predicted_sell": {"$gte": min_units_per_store}
+                }
+            },
+
+            # 4. Join product buat ambil nama
+            {
+                "$lookup": {
+                    "from": "product",
+                    "localField": "product_id",
+                    "foreignField": "_id",
+                    "as": "product_info"
+                }
+            },
+            {"$unwind": "$product_info"},
+
+            # 5. Group by kecamatan + product_id
+            {
+                "$group": {
+                    "_id": {
+                        "kecamatan": "$warung_info.kecamatan",
+                        "product_id": "$product_id"
+                    },
+                    "product_name": {"$first": "$product_info.product_name"},
+                    "total_units": {"$sum": "$predicted_sell"},
+                    "store_count": {"$addToSet": "$warung_id"},
+                    "stores": {
+                        "$push": {
+                            "warung_id": "$warung_id",
+                            "owner_id": "$warung_info.owner_id",
+                            "predicted_sell": "$predicted_sell"
+                        }
+                    }
+                }
+            },
+
+            # 6. Hitung jumlah toko
+            {
+                "$addFields": {
+                    "store_count": {"$size": "$store_count"}
+                }
+            },
+
+            # 7. Filter jumlah toko >= min_stores
+            {
+                "$match": {
+                    "store_count": {"$gte": min_stores}
+                }
+            },
+
+            # 8. Group lagi by kecamatan → list produk diurutkan total_units desc
+            {
+                "$group": {
+                    "_id": "$_id.kecamatan",
+                    "products": {
+                        "$push": {
+                            "product_id": "$_id.product_id",
+                            "product_name": "$product_name",
+                            "total_units": "$total_units",
+                            "store_count": "$store_count",
+                            "stores": "$stores"
+                        }
+                    }
+                }
+            },
+            {
+                "$project": {
+                    "products": {
+                        "$sortArray": {
+                            "input": "$products",
+                            "sortBy": {"total_units": -1}
+                        }
+                    }
+                }
+            },
+
+            # 9. Ambil produk top & runner-up untuk cek dominasi
+            {
+                "$project": {
+                    "top_product": {"$arrayElemAt": ["$products", 0]},
+                    "runner_up": {"$arrayElemAt": ["$products", 1]}
+                }
+            },
+
+            # 10. Filter dominasi
+            {
+                "$match": {
+                    "$expr": {
+                        "$or": [
+                            {"$eq": ["$runner_up", None]},
+                            {
+                                "$gte": [
+                                    "$top_product.total_units",
+                                    {
+                                        "$multiply": [
+                                            "$runner_up.total_units",
+                                            1 + dominance_gap_pct
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
         ]
