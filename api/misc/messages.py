@@ -20,7 +20,7 @@ Contoh: *Warung : Ramirez Jatinangor*"""
 
     def REG_WILAYAH_MSG(warung_name: str):
         return f"""Terimakasih *{warung_name}*!
-Kemudian silahkan isi wilayah warungmu.  
+Kemudian silahkan isi wilayah warungmu dengan Desa/Kelurahan, Kecamatan, Kabupaten/Kota, dan Provinsi
 Contoh: *Desa : Bojong Kulur*
 *Kecamatan : Gunung Putri*
 *Kabupaten : Bogor*
@@ -197,3 +197,12 @@ Balas *angka* untuk pilih menu berikut :
 1. Setor Penjualan Hari Ini
 2. Prediksi Permintaan Besok
 3. Cek Stok Warung"""
+
+    WARUNG_NO_STOCK = """Warung belum memiliki stok barang,
+Silahkan input stok terlebih dahulu.
+
+Balas *angka* untuk pilih menu berikut :
+1. Setor Penjualan Hari Ini
+2. Prediksi Permintaan Besok
+3. Cek Stok Warung
+    """

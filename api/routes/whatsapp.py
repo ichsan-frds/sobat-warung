@@ -33,8 +33,8 @@ async def whatsapp_webhook(request: Request):
     
     elif state == State.INPUT_NAMA.value:
         try:
-            if "Nama :" in form_data["Body"]:
-                owner_name = form_data["Body"].split("Nama :")[1].strip()
+            if "Nama" in form_data["Body"]:
+                owner_name = form_data["Body"].split(":")[1].strip()
                 if not owner_name:
                     raise HTTPException(
                         status_code=400, detail="Nama Panggilan tidak boleh kosong")
@@ -56,8 +56,8 @@ async def whatsapp_webhook(request: Request):
     
     elif state == State.INPUT_NAMA_WARUNG.value:
         try:
-            if "Warung :" in form_data["Body"]:
-                warung_name = form_data["Body"].split("Warung :")[1].strip()
+            if "Warung" in form_data["Body"]:
+                warung_name = form_data["Body"].split(":")[1].strip()
                 if not warung_name:
                     raise HTTPException(
                         status_code=400, detail="Nama Warung tidak boleh kosong")
@@ -86,21 +86,21 @@ async def whatsapp_webhook(request: Request):
     elif state == State.INPUT_WILAYAH_WARUNG.value:
         try:
             if (
-                ("Desa :" in form_data["Body"] or "Kelurahan :" in form_data["Body"]) 
-                and "Kecamatan :" in form_data["Body"] 
-                and ("Kota :" in form_data["Body"] or "Kabupaten :" in form_data["Body"]) 
-                and "Provinsi :" in form_data["Body"]
+                ("Desa" in form_data["Body"] or "Kelurahan" in form_data["Body"]) 
+                and "Kecamatan" in form_data["Body"] 
+                and ("Kota" in form_data["Body"] or "Kabupaten" in form_data["Body"]) 
+                and "Provinsi" in form_data["Body"]
             ):
                 lines = form_data["Body"].split("\n")
                 desa_kel = kecamatan = kota_kab = provinsi = None
                 for line in lines:
-                    if line.startswith("Desa :") or line.startswith("Kelurahan :"):
+                    if line.startswith("Desa") or line.startswith("Kelurahan"):
                         desa_kel = line.split(":", 1)[1].strip()
-                    elif line.startswith("Kecamatan :"):
+                    elif line.startswith("Kecamatan"):
                         kecamatan = line.split(":", 1)[1].strip()
-                    elif line.startswith("Kota :") or line.startswith("Kabupaten :"):
+                    elif line.startswith("Kota") or line.startswith("Kabupaten"):
                         kota_kab = line.split(":", 1)[1].strip()
-                    elif line.startswith("Provinsi :"):
+                    elif line.startswith("Provinsi"):
                         provinsi = line.split(":", 1)[1].strip()
                 if not desa_kel or not kecamatan or not kota_kab or not provinsi:
                     raise HTTPException(
@@ -134,9 +134,10 @@ async def whatsapp_webhook(request: Request):
             if form_data["MessageType"] == "location":
                 latitude = form_data["Latitude"]
                 longitude = form_data["Longitude"]
-            elif "Latitude :" in form_data["Body"] and "Longitude :" in form_data["Body"]:
-                latitude = form_data["Body"].split("Latitude :")[1].split(",")[0].strip()
-                longitude = form_data["Body"].split("Longitude :")[1].strip()
+            elif "Latitude" in form_data["Body"] and "Longitude" in form_data["Body"]:
+                latitude, longitude = form_data["Body"].split(",")
+                latitude = latitude.split(":")[1].strip()
+                longitude = longitude.split(":")[1].strip()
             else:
                 raise HTTPException(status_code=400, detail="Format tidak sesuai")
 
@@ -194,7 +195,14 @@ async def whatsapp_webhook(request: Request):
 
     elif state == State.MENU.value:
         if form_data["Body"] == '1': 
-            send_message(form_data["From"], Messages.MENU_1_MSG)
+            owner_data = await owner.find_one({"phone_number": form_data["From"]})
+            warung_data = await warung.find_one({"owner_id": owner_data.get("_id")})
+            stock_data = await stock.find_one({"warung_id": warung_data.get("_id")})
+            
+            if not stock_data:
+                send_message(form_data["From"], Messages.WARUNG_NO_STOCK)
+            else:
+                send_message(form_data["From"], Messages.MENU_1_MSG)
         elif "Terjual :" in form_data["Body"]:
             try:
                 lines = form_data["Body"].strip().split("\n")
@@ -285,10 +293,6 @@ async def whatsapp_webhook(request: Request):
                 }
             }).to_list(length=None)
 
-            # IF ada, panggil function predict dari model forecast
-            # Hasil predict dimasukin ke collection forecast
-            # Tampilin insight harus restock berapa, kasih juga info kenapa insight ini didapat (Pake text builder???)
-            # Contoh: Karena besok hari kemerdekaan, stock Teh Botol 15, Teh Kotak 10, dan Pocari 12
             if today_transactions:
                 forecast_results = predict_demand(today_transactions)
                 
@@ -307,7 +311,6 @@ async def whatsapp_webhook(request: Request):
                     insight_text += f"- {prod_name}: {f['predicted_sell']} pcs\n"
                 
                 send_message(form_data["From"], insight_text.strip())
-            # ELSE, suruh owner input dulu data transaksi hari ini
             else:
                 send_message(form_data["From"], "Belum ada transaksi hari ini. Silakan input data transaksi terlebih dahulu.")
         
