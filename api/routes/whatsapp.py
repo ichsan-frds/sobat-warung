@@ -200,9 +200,25 @@ async def whatsapp_webhook(request: Request):
             warung_data = await warung.find_one({"owner_id": owner_data.get("_id")})
             stock_data = await stock.find_one({"warung_id": warung_data.get("_id")})
             
+            today = datetime.now().date()
+            start = datetime.combine(today, datetime.min.time())
+            end = datetime.combine(
+                today + timedelta(days=1), datetime.min.time())
+
+            pipeline = Aggregate.get_transactions_and_product(warung_data.get("_id"), start, end)
+            cursor = await transaction.aggregate(pipeline)
+            today_transactions = await cursor.to_list(length=None)
+            
             if not stock_data:
                 send_message(form_data["From"], Messages.WARUNG_NO_STOCK)
             else:
+                if today_transactions:
+                    transaction_list = "\n".join(
+                        f"{item['product_info']['product_name']}, {item['quantity_sold']}, {item['total_price']}"
+                        for item in today_transactions
+                    )
+                    
+                    send_message(form_data["From"], Messages.TODAY_TRANSACTION(transaction_list))
                 send_message(form_data["From"], Messages.MENU_1_MSG)
         elif "Terjual :" in form_data["Body"]:
             try:
@@ -298,12 +314,13 @@ async def whatsapp_webhook(request: Request):
                 forecast_results = predict_demand(today_transactions)
                 
                 for f in forecast_results:
-                    await forecast.insert_one({
+                    await forecast.update_one({"warung_id": warung_id, "product_id": f["product_id"]},
+                    {
                         "date": datetime.now(),
                         "warung_id": warung_id,
                         "product_id": f["product_id"],
                         "predicted_sell": f["predicted_sell"]
-                    })
+                    }, upsert=True)
                     
                 insight_text = "Rekomendasi restock:\n"
                 for f in forecast_results:

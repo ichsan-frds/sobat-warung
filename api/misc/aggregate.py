@@ -42,3 +42,31 @@ class Aggregate():
                 "price": "$stock_data.price"
             }}
         ]
+    
+    def get_transactions_and_product(warung_id, start, end):
+        return [
+            {
+                "$match": {
+                    "warung_id": warung_id,
+                    "date": {
+                        "$gte": start,
+                        "$lt": end
+                    }
+                }
+            },
+            {
+                "$lookup": {
+                    "from": "product",               # Nama koleksi yang mau di-join
+                    "localField": "product_id",      # Field di transaction
+                    "foreignField": "_id",           # Field di product
+                    "as": "product_info"             # Hasil join disimpan di field ini
+                }
+            },
+            {
+                "$unwind": {
+                    "path": "$product_info",
+                    # Kalau produk nggak ketemu, tetap simpan transaksi
+                    "preserveNullAndEmptyArrays": True
+                }
+            }
+        ]

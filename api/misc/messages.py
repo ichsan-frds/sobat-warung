@@ -206,3 +206,10 @@ Balas *angka* untuk pilih menu berikut :
 2. Prediksi Permintaan Besok
 3. Cek Stok Warung
     """
+    
+    def TODAY_TRANSACTION(transactions): 
+        return f"""Hari ini warung sudah menjual:
+*Nama Barang*, *Terjual*, *Total*
+
+{transactions}
+    """
