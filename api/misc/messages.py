@@ -213,3 +213,24 @@ Balas *angka* untuk pilih menu berikut :
 
 {transactions}
     """
+
+    def COLLECTIVE_BUYING_MSG(unique_owner_ids: list[str], produk_str: str, price_after_disc: int):
+        return f"""Peringatan! 
+{len(unique_owner_ids) - 1} warung di sekitar Anda juga butuh {produk_str}.
+Beli bersama dan hemat 12%. Harga kolektif: Rp {price_after_disc:,}.
+Mau ikut?
+Iya -> Ketik *Ya*
+Tidak -> Ketik *Tidak*"""
+    
+    EXCEPTION_COLLECTIVE_BUYING_MSG = """Format salah!
+Mau ikut beli bersama?
+Iya -> Ketik *Ya*
+Tidak -> Ketik *Tidak*"""
+
+    def MENU_POST_COLLECTIVE_BUYING_MSG(owner_name: str):
+        return f"""Terimakasih telah ikut pembelian bersama {owner_name}!
+Selamat datang di Sobat Warung.
+Balas *angka* untuk pilih menu berikut :
+1. Setor Penjualan Hari Ini
+2. Prediksi Permintaan Besok
+3. Cek Stok Warung"""

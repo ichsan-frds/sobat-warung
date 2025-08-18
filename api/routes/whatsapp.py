@@ -5,7 +5,7 @@ from api.misc.messages import Messages
 from api.misc.states import State
 from api.misc.aggregate import Aggregate
 from api.misc.utils import find_similar_product, predict_demand
-from api.core.database import owner, warung, stock, product, transaction, forecast
+from api.core.database import owner, warung, stock, product, transaction, forecast, collective_buying
 from datetime import datetime, timedelta
 
 router = APIRouter()
@@ -519,14 +519,65 @@ async def whatsapp_webhook(request: Request):
                 print(e)
                 send_message(form_data["From"], Messages.EXCEPTION_MENU_3_INPUT_STOK_MSG)
 
+    elif state == State.COLLECTIVE_BUYING.value:
+        try:
+            owner_data = await owner.find_one({"phone_number": form_data["From"]})
+            warung_data = await warung.find_one({"owner_id": owner_data["_id"]})
+            warung_id = warung_data["_id"]
+            
+            if form_data["Body"] == 'Ya':
+
+                latest_entry = await collective_buying.find_one(
+                    {"warung_id": warung_id, "user_responded": False},
+                    sort=[("created_at", -1)]
+                )
+
+                if latest_entry:
+                    await collective_buying.update_one(
+                        {"_id": latest_entry["_id"]},
+                        {"$set": {"user_responded": True}}
+                    )
+                else:
+                    raise HTTPException(status_code=404, detail="Tidak ada pembelian kolektif yang aktif")
+
+            elif form_data["Body"] == 'Tidak':
+                await collective_buying.delete_one({
+                    "warung_id": warung_id,
+                    "user_responded": False
+                })
+
+            else:
+                raise HTTPException(status_code=400, detail="Format tidak sesuai")
+            
+            await owner.update_one({"phone_number": form_data["From"]}, {
+                    "$set": {
+                        "state": State.MENU.value
+                        }
+                    })
+
+            owner_name = owner_data.get("owner_name", "Sobat Warung")
+                    
+            send_message(form_data["From"], Messages.MENU_POST_COLLECTIVE_BUYING_MSG(owner_data["owner_name"]))
+
+        except Exception as e:
+            print(e)
+            send_message(form_data["From"], Messages.EXCEPTION_COLLECTIVE_BUYING_MSG)
+
 @router.post("/send-collective-buying")
 async def send_collective_buying_message():
+    # Hapus semua entri collective_buying yang belum direspon
     # Ambil distinct key "warung_id" dari collection forecast
     # Untuk setiap warung_id, ambil key "kecamatan"
     # Group By Kecamatan lihat barang yang paling dibutuhkan dari collection forecast
     # Untuk setiap kecamatan dan barang, kirim pesan ke semua warung yang butuh barang di kecamatan tsb (menggunakan key "owner_id", lalu ambil phone_number)
     try:
-        pipeline = Aggregate.get_forecasted_products_group_by_kecamatan_pipeline(min_stores=1, min_units_per_store=1, dominance_gap_pct=0)
+        await collective_buying.delete_many({
+                    "user_responded": False
+                })
+        
+        pipeline = Aggregate.get_forecasted_products_group_by_kecamatan_pipeline(
+            # min_stores=1, min_units_per_store=1, dominance_gap_pct=0 # UNCOMMENT UNTUK TESTING
+            )
         cursor = await forecast.aggregate(pipeline)
         results = await cursor.to_list(length=None)
         print("results:", results)  # UNCOMMENT DI PRODUCTION
@@ -541,18 +592,20 @@ async def send_collective_buying_message():
 
             # Gabung semua produk jadi satu list
             product_names = []
-            harga_per_bundle = 0
+            product_ids = []
+            total_price = 0
             total_units = 0
             for individual_product in products:
                 product_names.append(individual_product["product_name"])
-                # POTENTIAL N+1 QUERY
-                stock_data = await stock.find_one({"product_id": individual_product["product_id"]})
-                harga_per_bundle = stock_data.get("price", 0)
-                total_units += individual_product.get("total_units", 0)
+                product_ids.append(individual_product["product_id"])
+                stock_data = await stock.find_one({"product_id": individual_product["product_id"]}) # POTENTIAL N+1 QUERY
+                price = stock_data.get("price", 0)
+                units = individual_product.get("total_units", 0)
+                total_units += units
+                total_price += price * units            
 
-            harga_kolektif = total_units * harga_per_bundle
             # Diskon 12%
-            harga_setelah_diskon = round(harga_kolektif * 0.88)
+            price_after_disc = round(total_price * 0.88)
 
             # Ambil semua warung yang butuh di kecamatan ini
             all_stores = []
@@ -579,10 +632,29 @@ async def send_collective_buying_message():
                 # Format produk jadi string dipisah koma
                 produk_str = ", ".join(product_names)
 
+                await owner.update_one({"_id": owner_id}, {
+                    "$set": {
+                        "state": State.COLLECTIVE_BUYING.value
+                        }
+                    })
+                
+                warung_data = await warung.find_one({"owner_id": owner_id})
+                warung_id = warung_data["_id"]
+
+                await collective_buying.insert_one({
+                    "date": datetime.now(),
+                    "kecamatan": kecamatan_data["kecamatan"],
+                    "warung_id": warung_id,
+                    "product_ids": product_ids,
+                    "total_units": total_units,
+                    "price": price_after_disc,
+                    "user_responded": False
+                })
+
                 send_message(phone_number, Messages.COLLECTIVE_BUYING_MSG(
                     unique_owner_ids=unique_owner_ids,
                     produk_str=produk_str,
-                    harga_setelah_diskon=harga_setelah_diskon
+                    price_after_disc=price_after_disc
                 ))
     except Exception as e:
             print(e)
