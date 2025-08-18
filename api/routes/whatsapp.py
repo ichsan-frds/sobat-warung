@@ -11,11 +11,12 @@ from datetime import datetime, timedelta
 router = APIRouter()
 
 def send_message(to: str, body: str):
-    return client.messages.create(
-        to=to,
-        from_=os.getenv("FROM_WA_NUMBER"),
-        body=body
-    )
+    print(body)
+    # return client.messages.create(
+    #     to=to,
+    #     from_=os.getenv("FROM_WA_NUMBER"),
+    #     body=body
+    # )
 
 @router.post("/")
 async def whatsapp_webhook(request: Request):
@@ -267,8 +268,8 @@ async def whatsapp_webhook(request: Request):
                 owner_name = owner_data.get("owner_name", "Sobat Warung")
                 send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_data["owner_name"]))
 
-            except HTTPException as e:
-                if e.status_code == 404:
+            except Exception as e:
+                if isinstance(e, HTTPException) and e.status_code == 404:
                     send_message(form_data["From"], Messages.EXCEPTION_MENU_1_MSG(e.status_code, e.detail))
                 else:
                     print(e)
@@ -404,12 +405,17 @@ async def whatsapp_webhook(request: Request):
                         if not product_data:
                             insert_result = await product.insert_one({"product_name": product_name})
                             product_id = insert_result.inserted_id
+                            new_stock_count = stock_count
                         else:
+                            stock_data = await stock.find_one({"product_id": product_data.get("_id"), "warung_id": warung_id})
+                            if stock_data:
+                                new_stock_count = int(stock_data.get("stock_count")) + stock_count
+                            
                             product_id = product_data["_id"]
 
                         await stock.update_one(
                             {"warung_id": warung_id, "product_id": product_id},
-                            {"$set": {"stock_count": stock_count, "price": price, "last_transaction": datetime.now()}},
+                            {"$set": {"stock_count": new_stock_count, "price": price, "last_transaction": datetime.now()}},
                             upsert=True
                         )
                 else:
@@ -437,8 +443,8 @@ async def whatsapp_webhook(request: Request):
                 owner_name = owner_data.get("owner_name", "Sobat Warung")
                 send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_data["owner_name"]))
                 
-            except HTTPException as e:
-                if e.status_code == 404:
+            except Exception as e:
+                if isinstance(e, HTTPException) and e.status_code == 404:
                     send_message(form_data["From"], Messages.EXCEPTION_MENU_3_EDIT_STOK_MSG(edit_type, e.status_code, e.detail))
                 else:
                     print(e)
