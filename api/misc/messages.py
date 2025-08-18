@@ -20,7 +20,7 @@ Contoh: *Warung : Ramirez Jatinangor*"""
 
     def REG_WILAYAH_MSG(warung_name: str):
         return f"""Terimakasih *{warung_name}*!
-Kemudian silahkan isi wilayah warungmu.  
+Kemudian silahkan isi wilayah warungmu dengan Desa/Kelurahan, Kecamatan, Kabupaten/Kota, dan Provinsi
 Contoh: *Desa : Bojong Kulur*
 *Kecamatan : Gunung Putri*
 *Kabupaten : Bogor*
@@ -197,11 +197,19 @@ Balas *angka* untuk pilih menu berikut :
 1. Setor Penjualan Hari Ini
 2. Prediksi Permintaan Besok
 3. Cek Stok Warung"""
+
+    WARUNG_NO_STOCK = """Warung belum memiliki stok barang,
+Silahkan input stok terlebih dahulu.
+
+Balas *angka* untuk pilih menu berikut :
+1. Setor Penjualan Hari Ini
+2. Prediksi Permintaan Besok
+3. Cek Stok Warung
+    """
     
-    def COLLECTIVE_BUYING_MSG(unique_owner_ids: list[str], produk_str: str, harga_setelah_diskon: int):
-        return f"""Peringatan! 
-{len(unique_owner_ids)} warung di sekitar Anda juga butuh {produk_str}.
-Beli bersama dan hemat 12%. Harga kolektif: Rp {harga_setelah_diskon:,}.
-Mau ikut?
-Iya -> Ketik *Ya*
-Tidak -> Ketik *Tidak*"""
+    def TODAY_TRANSACTION(transactions): 
+        return f"""Hari ini warung sudah menjual:
+*Nama Barang*, *Terjual*, *Total*
+
+{transactions}
+    """
