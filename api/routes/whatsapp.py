@@ -12,11 +12,11 @@ router = APIRouter()
 
 def send_message(to: str, body: str):
     print(body)
-    # return client.messages.create(
-    #     to=to,
-    #     from_=os.getenv("FROM_WA_NUMBER"),
-    #     body=body
-    # )
+    return client.messages.create(
+        to=to,
+        from_=os.getenv("FROM_WA_NUMBER"),
+        body=body
+    )
 
 @router.post("/")
 async def whatsapp_webhook(request: Request):
@@ -28,6 +28,7 @@ async def whatsapp_webhook(request: Request):
     if state is None:
         await owner.insert_one({
             "phone_number": form_data["From"],
+            "credit_score": False,
             "state": State.INPUT_NAMA.value
         })
         send_message(form_data["From"], Messages.WELCOME_MSG)
@@ -171,9 +172,6 @@ async def whatsapp_webhook(request: Request):
     elif state == State.TIPE_WARUNG.value:
         try:
             if form_data["Body"] in ['A', 'B', 'C', 'D']:
-                owner_data = await owner.find_one({"phone_number": form_data["From"]})
-                owner_id = owner_data.get("_id")
-                owner_name = owner_data.get("owner_name", "Sobat Warung")
                 await warung.update_one({"owner_id": owner_id},{
                     "$set": {
                         "type": form_data["Body"]
@@ -189,23 +187,37 @@ async def whatsapp_webhook(request: Request):
             else:
                 raise HTTPException(
                     status_code=400, detail="Format tidak sesuai")
-            send_message(form_data["From"], Messages.MENU_MSG(owner_name))
+                
+            owner_data = await owner.find_one({"phone_number": form_data["From"]})
+            owner_id = owner_data.get("_id")
+            owner_name = owner_data.get("owner_name", "Sobat Warung")
+            warung_data = await warung.find_one({"owner_id": owner_id})
+            warung_id = warung_data["_id"]
+
+            pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
+            cursor = await transaction.aggregate(pipeline)
+            count_transaction_days = await cursor.to_list(length=1)
+            days_left = 30 - count_transaction_days[0]["unique_days"]
+
+            credit_score = owner_data.get("credit_score", False)
+            send_message(form_data["From"], Messages.MENU_CREDIT_SCORE_MSG(owner_name, days_left, credit_score))
         except Exception as e:
             print(e)
             send_message(form_data["From"], Messages.EXCEPTION_REG_TIPE_MSG)
 
     elif state == State.MENU.value:
+        owner_data = await owner.find_one({"phone_number": form_data["From"]})
+        credit_score = owner_data.get("credit_score", False)
+
         if form_data["Body"] == '1': 
             owner_data = await owner.find_one({"phone_number": form_data["From"]})
             warung_data = await warung.find_one({"owner_id": owner_data.get("_id")})
             stock_data = await stock.find_one({"warung_id": warung_data.get("_id")})
             
             today = datetime.now().date()
-            start = datetime.combine(today, datetime.min.time())
-            end = datetime.combine(
-                today + timedelta(days=1), datetime.min.time())
+            normalized_today = datetime.combine(today, datetime.min.time())
 
-            pipeline = Aggregate.get_transactions_and_product(warung_data.get("_id"), start, end)
+            pipeline = Aggregate.get_transactions_and_product(warung_data.get("_id"), normalized_today)
             cursor = await transaction.aggregate(pipeline)
             today_transactions = await cursor.to_list(length=None)
             
@@ -262,27 +274,38 @@ async def whatsapp_webhook(request: Request):
                         )
                     product_price = stock_data["price"]
 
-                    await transaction.insert_one(
+                    await transaction.update_one(
                         {
-                            "date": datetime.now(),
+                            "date": datetime.combine(datetime.now().date(), datetime.min.time()),
                             "warung_id": warung_id,
-                            "product_id": product_id,
-                            "quantity_sold": quantity_sold,
-                            "total_price": quantity_sold * product_price
-                        }
+                            "product_id": product_id
+                        },
+                        {
+                            "$inc": {
+                                "quantity_sold": quantity_sold,
+                                "total_price": quantity_sold * product_price
+                            }
+                        },
+                        upsert=True
                     )
 
                     await stock.update_one(
                         {"warung_id": warung_id, "product_id": product_id},
                         {
                             "$inc": {"stock_count": -quantity_sold},
-                            "$set": {"last_transaction": datetime.now()}
+                            "$set": {"last_transaction": datetime.combine(datetime.now().date(), datetime.min.time())}
                         }
                     )
 
-                owner_data = await owner.find_one({"phone_number": form_data["From"]})
                 owner_name = owner_data.get("owner_name", "Sobat Warung")
-                send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_data["owner_name"]))
+                warung_data = await warung.find_one({"owner_id": owner_data["_id"]})
+                warung_id = warung_data["_id"]
+
+                pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
+                cursor = await transaction.aggregate(pipeline)
+                count_transaction_days = await cursor.to_list(length=1)
+                days_left = 30 - count_transaction_days[0]["unique_days"]
+                send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_name, days_left, credit_score))
 
             except Exception as e:
                 if isinstance(e, HTTPException) and e.status_code == 404:
@@ -299,15 +322,11 @@ async def whatsapp_webhook(request: Request):
             warung_id = warung_data["_id"]
             
             today = datetime.now().date()
-            start = datetime.combine(today, datetime.min.time())
-            end = datetime.combine(today + timedelta(days=1), datetime.min.time())
+            normalized_today = datetime.combine(today, datetime.min.time())
             
             today_transactions = await transaction.find({
                 "warung_id": warung_id,
-                "date": {
-                    "$gte": start,
-                    "$lt": end
-                }
+                "date": normalized_today
             }).to_list(length=None)
 
             if today_transactions:
@@ -316,7 +335,7 @@ async def whatsapp_webhook(request: Request):
                 for f in forecast_results:
                     await forecast.update_one({"warung_id": warung_id, "product_id": f["product_id"]},
                     {
-                        "date": datetime.now(),
+                        "date": datetime.combine(datetime.now().date(), datetime.min.time()),
                         "warung_id": warung_id,
                         "product_id": f["product_id"],
                         "predicted_sell": f["predicted_sell"]
@@ -356,6 +375,18 @@ async def whatsapp_webhook(request: Request):
                 send_message(form_data["From"], Messages.MENU_3_CEK_STOK_MSG(stock_list))
                 send_message(form_data["From"], Messages.CEK_STOK_CHOICES_MSG)
 
+        elif form_data["Body"] == '4' and credit_score:
+            owner_name = owner_data.get("owner_name", "Sobat Warung")
+            warung_data = await warung.find_one({"owner_id": owner_data["_id"]})
+            warung_id = warung_data["_id"]
+
+            pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
+            cursor = await transaction.aggregate(pipeline)
+            count_transaction_days = await cursor.to_list(length=1)
+            days_left = 30 - count_transaction_days[0]["unique_days"]
+
+            send_message(form_data["From"], Messages.CREDIT_SCORE_MSG)
+            send_message(form_data["From"], Messages.MENU_CREDIT_SCORE_MSG(owner_name, days_left, credit_score))
         elif form_data["Body"] in ['Tambah', 'Update', 'Hapus']:
             await owner.update_one({"phone_number": form_data["From"]}, {
                     "$set": {
@@ -365,8 +396,16 @@ async def whatsapp_webhook(request: Request):
             send_message(form_data["From"], Messages.MENU_3_EDIT_STOK_MSG(form_data["Body"]))
 
         else:
-            owner_name = (await owner.find_one({"phone_number": form_data["From"]}) or {}).get("owner_name", "Sobat Warung")
-            send_message(form_data["From"], Messages.MENU_MSG(owner_name))
+            owner_name = owner_data.get("owner_name", "Sobat Warung")
+            warung_data = await warung.find_one({"owner_id": owner_data["_id"]})
+            warung_id = warung_data["_id"]
+
+            pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
+            cursor = await transaction.aggregate(pipeline)
+            count_transaction_days = await cursor.to_list(length=1)
+            days_left = 30 - count_transaction_days[0]["unique_days"]
+
+            send_message(form_data["From"], Messages.MENU_CREDIT_SCORE_MSG(owner_name, days_left, credit_score))
 
     elif state == State.EDIT_STOK.value:
         if form_data["Body"] in ['Tambah', 'Update', 'Hapus']:
@@ -382,8 +421,18 @@ async def whatsapp_webhook(request: Request):
                         "state": State.MENU.value
                         }
                     })
-            owner_name = (await owner.find_one({"phone_number": form_data["From"]}) or {}).get("owner_name", "Sobat Warung")
-            send_message(form_data["From"], Messages.MENU_MSG(owner_name))
+            owner_data = await owner.find_one({"phone_number": form_data["From"]})
+            owner_name = owner_data.get("owner_name", "Sobat Warung")
+            warung_data = await warung.find_one({"owner_id": owner_data["_id"]})
+            warung_id = warung_data["_id"]
+
+            pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
+            cursor = await transaction.aggregate(pipeline)
+            count_transaction_days = await cursor.to_list(length=1)
+            days_left = 30 - count_transaction_days[0]["unique_days"]
+
+            credit_score = owner_data.get("credit_score", False)
+            send_message(form_data["From"], Messages.MENU_CREDIT_SCORE_MSG(owner_name, days_left, credit_score))
         else:
             try:
                 lines = form_data["Body"].strip().split("\n")
@@ -432,7 +481,7 @@ async def whatsapp_webhook(request: Request):
 
                         await stock.update_one(
                             {"warung_id": warung_id, "product_id": product_id},
-                            {"$set": {"stock_count": new_stock_count, "price": price, "last_transaction": datetime.now()}},
+                            {"$set": {"stock_count": new_stock_count, "price": price, "last_transaction": datetime.combine(datetime.now().date(), datetime.min.time())}},
                             upsert=True
                         )
                 else:
@@ -458,7 +507,16 @@ async def whatsapp_webhook(request: Request):
                     })
                 owner_data = await owner.find_one({"phone_number": form_data["From"]})
                 owner_name = owner_data.get("owner_name", "Sobat Warung")
-                send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_data["owner_name"]))
+                warung_data = await warung.find_one({"owner_id": owner_data["_id"]})
+                warung_id = warung_data["_id"]
+
+                pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
+                cursor = await transaction.aggregate(pipeline)
+                count_transaction_days = await cursor.to_list(length=1)
+                days_left = 30 - count_transaction_days[0]["unique_days"]
+
+                credit_score = owner_data.get("credit_score", False)
+                send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_name, days_left, credit_score))
                 
             except Exception as e:
                 if isinstance(e, HTTPException) and e.status_code == 404:
@@ -474,8 +532,18 @@ async def whatsapp_webhook(request: Request):
                         "state": State.MENU.value
                         }
                     })
-            owner_name = (await owner.find_one({"phone_number": form_data["From"]}) or {}).get("owner_name", "Sobat Warung")
-            send_message(form_data["From"], Messages.MENU_MSG(owner_name))
+            owner_data = await owner.find_one({"phone_number": form_data["From"]})
+            owner_name = owner_data.get("owner_name", "Sobat Warung")
+            warung_data = await warung.find_one({"owner_id": owner_data["_id"]})
+            warung_id = warung_data["_id"]
+
+            pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
+            cursor = await transaction.aggregate(pipeline)
+            count_transaction_days = await cursor.to_list(length=1)
+            days_left = 30 - count_transaction_days[0]["unique_days"]
+
+            credit_score = owner_data.get("credit_score", False)
+            send_message(form_data["From"], Messages.MENU_CREDIT_SCORE_MSG(owner_name, days_left, credit_score))
         else:
             try:
                 owner_data = await owner.find_one({"phone_number": form_data["From"]})
@@ -502,7 +570,7 @@ async def whatsapp_webhook(request: Request):
                     
                     await stock.update_one(
                         {"warung_id": warung_id, "product_id": product_id},
-                        {"$set": {"stock_count": stock_count, "price": price, "last_transaction": datetime.now()}},
+                        {"$set": {"stock_count": stock_count, "price": price, "last_transaction": datetime.combine(datetime.now().date(), datetime.min.time())}},
                         upsert=True
                     )
 
@@ -511,10 +579,17 @@ async def whatsapp_webhook(request: Request):
                             "state": State.MENU.value
                             }
                     })
-                    owner_data = await owner.find_one({"phone_number": form_data["From"]})
-                    owner_name = owner_data.get("owner_name", "Sobat Warung")
-                    
-                send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_data["owner_name"]))
+                owner_name = owner_data.get("owner_name", "Sobat Warung")
+                warung_data = await warung.find_one({"owner_id": owner_data["_id"]})
+                warung_id = warung_data["_id"]
+
+                pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
+                cursor = await transaction.aggregate(pipeline)
+                count_transaction_days = await cursor.to_list(length=1)
+                days_left = 30 - count_transaction_days[0]["unique_days"]
+
+                credit_score = owner_data.get("credit_score", False)
+                send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_name, days_left, credit_score))
             except Exception as e:
                 print(e)
                 send_message(form_data["From"], Messages.EXCEPTION_MENU_3_INPUT_STOK_MSG)
@@ -556,8 +631,17 @@ async def whatsapp_webhook(request: Request):
                     })
 
             owner_name = owner_data.get("owner_name", "Sobat Warung")
+            warung_data = await warung.find_one({"owner_id": owner_data["_id"]})
+            warung_id = warung_data["_id"]
+
+            pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
+            cursor = await transaction.aggregate(pipeline)
+            count_transaction_days = await cursor.to_list(length=1)
+            days_left = 30 - count_transaction_days[0]["unique_days"]
+
+            credit_score = owner_data.get("credit_score", False)
                     
-            send_message(form_data["From"], Messages.MENU_POST_COLLECTIVE_BUYING_MSG(owner_data["owner_name"]))
+            send_message(form_data["From"], Messages.MENU_POST_COLLECTIVE_BUYING_MSG(owner_name, days_left, credit_score))
 
         except Exception as e:
             print(e)
@@ -642,7 +726,7 @@ async def send_collective_buying_message():
                 warung_id = warung_data["_id"]
 
                 await collective_buying.insert_one({
-                    "date": datetime.now(),
+                    "date": datetime.combine(datetime.now().date(), datetime.min.time()),
                     "kecamatan": kecamatan_data["kecamatan"],
                     "warung_id": warung_id,
                     "product_ids": product_ids,

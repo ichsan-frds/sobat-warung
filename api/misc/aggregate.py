@@ -51,17 +51,13 @@ class Aggregate():
         dominance_gap_pct=0.1  # Selisih minimal dominasi produk
     ):
         today = datetime.now().date()
-        start = datetime.combine(today, datetime.min.time())
-        end = datetime.combine(today + timedelta(days=1), datetime.min.time())
+        normalized_today = datetime.combine(today, datetime.min.time())
 
         return [
             # 1. Filter forecast hari ini
             {
                 "$match": {
-                    "date": {
-                        "$gte": start,
-                        "$lt": end
-                    }
+                    "date": normalized_today
                 }
             },
 
@@ -185,16 +181,13 @@ class Aggregate():
             }
         ]
     
-    def get_transactions_and_product(warung_id, start, end):
+    def get_transactions_and_product(warung_id, target_date):
         return [
             {
-                "$match": {
-                    "warung_id": warung_id,
-                    "date": {
-                        "$gte": start,
-                        "$lt": end
-                    }
-                }
+            "$match": {
+                "warung_id": warung_id,
+                "date": target_date
+            }
             },
             {
                 "$lookup": {
@@ -210,5 +203,32 @@ class Aggregate():
                     # Kalau produk nggak ketemu, tetap simpan transaksi
                     "preserveNullAndEmptyArrays": True
                 }
+            }
+        ]
+    
+    def get_days_left_by_warung_pipeline(warung_id):
+        return [
+            {
+                "$match": {
+                    "warung_id": warung_id
+                }
+            },
+            {
+                "$project": {
+                    "date": {
+                        "$dateToString": {
+                            "format": "%Y-%m-%d",
+                            "date": "$date"
+                        }
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$date"
+                }
+            },
+            {
+                "$count": "unique_days"
             }
         ]

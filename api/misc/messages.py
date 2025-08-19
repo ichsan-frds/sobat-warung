@@ -71,6 +71,34 @@ Balas *angka* untuk pilih menu berikut :
 2. Prediksi Permintaan Besok
 3. Cek Stok Warung"""
     
+    def MENU_CREDIT_SCORE_MSG(owner_name: str, days_left: int, credit_score: bool = False):
+        if credit_score:
+            message =  f"""👋 Hai {owner_name}!
+Selamat datang di Sobat Warung.
+
+*Selamat anda berhak meraih kesempatan untuk mengembangkan*
+*warung anda, Balas angka 4 untuk mempelajari lebih lanjut*
+
+Balas *angka* untuk pilih menu berikut :
+1. Setor Penjualan Hari Ini
+2. Prediksi Permintaan Besok
+3. Cek Stok Warung
+4. Kembangkan Bisnismu"""
+        else:
+            message =  f"""👋 Hai {owner_name}!
+Selamat datang di Sobat Warung.
+
+*Ayo setorkan penjualan harianmu setiap hari selama {days_left} hari ke*
+*depan dan raih kesempatan untuk mengembangkan bisnismu*
+*dengan pinjaman dana hingga Rp. 10.000.000*
+
+Balas *angka* untuk pilih menu berikut :
+1. Setor Penjualan Hari Ini
+2. Prediksi Permintaan Besok
+3. Cek Stok Warung"""
+        
+        return message
+    
     MENU_1_MSG = """Apa saja yang terjual hari ini?  
 Ketik dengan format: 
 *Terjual : Barang1, jumlah1* 
@@ -190,13 +218,33 @@ Contoh: *Indomie Goreng, 10, 3000*
 *Aqua 1.5 L, 20, 8000*
 *Aqua Gelas 1 Dus, 5, 45000*"""
 
-    def MENU_POST_INPUT_MSG(owner_name: str):
-        return f"""Terimakasih sudah meng-update stok {owner_name}!
+    def MENU_POST_INPUT_MSG(owner_name: str, days_left: int, credit_score: bool = False):
+        if credit_score:
+            message =  f"""Terimakasih sudah meng-update stok {owner_name}!
 Selamat datang di Sobat Warung.
+
+*Selamat anda berhak meraih kesempatan untuk mengembangkan*
+*warung anda, Balas angka 4 untuk mempelajari lebih lanjut*
+
+Balas *angka* untuk pilih menu berikut :
+1. Setor Penjualan Hari Ini
+2. Prediksi Permintaan Besok
+3. Cek Stok Warung
+4. Kembangkan Bisnismu"""
+        else:
+            message =  f"""Terimakasih sudah meng-update stok {owner_name}!
+Selamat datang di Sobat Warung.
+
+*Ayo setorkan penjualan harianmu setiap hari selama {days_left} hari ke*
+*depan dan raih kesempatan untuk mengembangkan bisnismu*
+*dengan pinjaman dana hingga Rp. 10.000.000*
+
 Balas *angka* untuk pilih menu berikut :
 1. Setor Penjualan Hari Ini
 2. Prediksi Permintaan Besok
 3. Cek Stok Warung"""
+        
+        return message
 
     WARUNG_NO_STOCK = """Warung belum memiliki stok barang,
 Silahkan input stok terlebih dahulu.
@@ -214,6 +262,12 @@ Balas *angka* untuk pilih menu berikut :
 {transactions}
     """
 
+    CREDIT_SCORE_MSG = """Selamat dan terima kasih atas kesetiaanmu mencatat penjualan harian!
+Catatan yang kamu isi sangat bermanfaat karena makin banyak yang mencatat, 
+makin tepat juga perkiraan kebutuhan usaha ke depannya.
+Sekarang, kamu punya kesempatan untuk mengembangkan usahamu dengan pinjaman hingga 10 juta rupiah.
+Klik link berikut untuk info cara klaimnya : wa.me/621234567890."""
+
     def COLLECTIVE_BUYING_MSG(unique_owner_ids: list[str], produk_str: str, price_after_disc: int):
         return f"""Peringatan! 
 {len(unique_owner_ids) - 1} warung di sekitar Anda juga butuh {produk_str}.
@@ -227,10 +281,30 @@ Mau ikut beli bersama?
 Iya -> Ketik *Ya*
 Tidak -> Ketik *Tidak*"""
 
-    def MENU_POST_COLLECTIVE_BUYING_MSG(owner_name: str):
-        return f"""Terimakasih telah ikut pembelian bersama {owner_name}!
+    def MENU_POST_COLLECTIVE_BUYING_MSG(owner_name: str, days_left: int, credit_score: bool = False):
+        if credit_score:
+            message =  f"""Terimakasih telah ikut pembelian bersama {owner_name}!
 Selamat datang di Sobat Warung.
+
+*Selamat anda berhak meraih kesempatan untuk mengembangkan*
+*warung anda, Balas angka 4 untuk mempelajari lebih lanjut*
+
+Balas *angka* untuk pilih menu berikut :
+1. Setor Penjualan Hari Ini
+2. Prediksi Permintaan Besok
+3. Cek Stok Warung
+4. Kembangkan Bisnismu"""
+        else:
+            message =  f"""Terimakasih telah ikut pembelian bersama {owner_name}!
+Selamat datang di Sobat Warung.
+
+*Ayo setorkan penjualan harianmu setiap hari selama {days_left} hari ke*
+*depan dan raih kesempatan untuk mengembangkan bisnismu*
+*dengan pinjaman dana hingga Rp. 10.000.000*
+
 Balas *angka* untuk pilih menu berikut :
 1. Setor Penjualan Hari Ini
 2. Prediksi Permintaan Besok
 3. Cek Stok Warung"""
+        
+        return message
