@@ -469,9 +469,7 @@ async def whatsapp_webhook(request: Request):
 
                         product_data = await find_similar_product(product_name)
                         if not product_data:
-                            insert_result = await product.insert_one({"product_name": product_name})
-                            product_id = insert_result.inserted_id
-                            new_stock_count = stock_count
+                            raise HTTPException(status_code=404, detail=f"Produk '{name}' tidak ditemukan")
                         else:
                             stock_data = await stock.find_one({"product_id": product_data.get("_id"), "warung_id": warung_id})
                             if stock_data:
@@ -563,8 +561,7 @@ async def whatsapp_webhook(request: Request):
 
                     product_data = await find_similar_product(product_name)
                     if not product_data:
-                        insert_result = await product.insert_one({"product_name": product_name})
-                        product_id = insert_result.inserted_id
+                        raise HTTPException(status_code=404, detail=f"Produk '{name}' tidak ditemukan")
                     else:
                         product_id = product_data["_id"]
                     
