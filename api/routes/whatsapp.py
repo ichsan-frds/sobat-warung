@@ -333,13 +333,16 @@ async def whatsapp_webhook(request: Request):
                 forecast_results = predict_demand(today_transactions)
                 
                 for f in forecast_results:
-                    await forecast.update_one({"warung_id": warung_id, "product_id": f["product_id"]},
-                    {
-                        "date": datetime.combine(datetime.now().date(), datetime.min.time()),
-                        "warung_id": warung_id,
-                        "product_id": f["product_id"],
-                        "predicted_sell": f["predicted_sell"]
-                    }, upsert=True)
+                    await forecast.update_one(
+                        {"warung_id": warung_id, "product_id": f["product_id"]},
+                        {"$set": {
+                            "date": datetime.combine(datetime.now().date(), datetime.min.time()),
+                            "warung_id": warung_id,
+                            "product_id": f["product_id"],
+                            "predicted_sell": f["predicted_sell"]
+                        }},
+                        upsert=True
+                    )
                     
                 insight_text = "Rekomendasi restock:\n"
                 for f in forecast_results:
