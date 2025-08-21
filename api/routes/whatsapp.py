@@ -332,6 +332,7 @@ async def whatsapp_webhook(request: Request):
                     "date": normalized_today
                 },
                 {
+                    "date": 1,
                     "warung_id": 1,
                     "product_id": 1,
                     "quantity_sold": 1,
@@ -339,6 +340,16 @@ async def whatsapp_webhook(request: Request):
                 }
             ).to_list(length=None))
 
+            product_ids = today_transactions["product_id"].unique().tolist()
+            product_names = await product.find(
+                {"_id": {"$in": product_ids}},
+                {"_id": 1, "product_name": 1}
+            ).to_list(length=None)
+
+            product_id_to_name = {doc["_id"]: doc["product_name"] for doc in product_names}
+            today_transactions["product_name"] = today_transactions["product_id"].map(product_id_to_name)
+            today_transactions.drop(columns=["product_id"], inplace=True)
+            
             warung_ids = today_transactions["warung_id"].unique().tolist()
 
             warung_info = pd.DataFrame(
