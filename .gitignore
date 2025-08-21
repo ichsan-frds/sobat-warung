@@ -1,0 +1,19 @@
+# ==== Folder ====
+__pycache__/
+.venv/
+artifacts_nadi_pasar/
+
+# ==== File ====
+backend_pipeline.ipynb
+Holiday Indonesian.csv
+holidays_events.csv
+oil.csv
+README.md
+stores.csv
+test.csv
+train.csv
+trainer_class.py
+
+# ==== Tidak di-ignore (hapus # kalau mau ikut ignore) ====
+# backend_pipeline.py
+# main.ipynb
