@@ -739,6 +739,7 @@ async def send_collective_buying_message():
                     "user_responded": False
                 })
 
+                print(f"Sending collective buying message to {phone_number}")
                 send_message(phone_number, Messages.COLLECTIVE_BUYING_MSG(
                     unique_owner_ids=unique_owner_ids,
                     produk_str=produk_str,
