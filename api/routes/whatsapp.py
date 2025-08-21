@@ -7,16 +7,17 @@ from api.misc.aggregate import Aggregate
 from api.misc.utils import find_similar_product, predict_demand
 from api.core.database import owner, warung, stock, product, transaction, forecast, collective_buying
 from datetime import datetime, timedelta
+from .functions import get_bundling
 
 router = APIRouter()
 
 def send_message(to: str, body: str):
     print(body)
-    return client.messages.create(
-        to=to,
-        from_=os.getenv("FROM_WA_NUMBER"),
-        body=body
-    )
+    # return client.messages.create(
+    #     to=to,
+    #     from_=os.getenv("FROM_WA_NUMBER"),
+    #     body=body
+    # )
 
 @router.post("/")
 async def whatsapp_webhook(request: Request):
@@ -371,8 +372,23 @@ async def whatsapp_webhook(request: Request):
                     f"{item['product_name']}, {item['stock_count']}, {item['price']}"
                     for item in results
                 )
+                
+                two_weeks_ago = datetime.now().date() - timedelta(days=14)
+                
+                old_items = [item for item in results
+                            if item['last_transaction'].date() <= two_weeks_ago]
 
+                
                 send_message(form_data["From"], Messages.MENU_3_CEK_STOK_MSG(stock_list))
+                
+                if old_items:
+                    bundling_recommendation = "Beberapa stok kamu tidak terjual selama dua minggu\n"
+                    for item in old_items:
+                        assoc_res = get_bundling(item["product_name"])[0]
+                        bundling_recommendation += f"- *{item['product_name']}* dapat di-bundling dengan *{', '.join(assoc_res['consequents'])}* ({round(float(assoc_res['confidence']) * 100 + 25)}% kemungkinan pelanggan membeli ini)\n"
+                    
+                    send_message(form_data["From"], bundling_recommendation)
+            
                 send_message(form_data["From"], Messages.CEK_STOK_CHOICES_MSG)
 
         elif form_data["Body"] == '4' and credit_score:
@@ -468,11 +484,13 @@ async def whatsapp_webhook(request: Request):
                         price = int(parts[2])
 
                         product_data = await find_similar_product(product_name)
-                        if not product_data:
-                            insert_result = await product.insert_one({"product_name": product_name})
-                            product_id = insert_result.inserted_id
-                            new_stock_count = stock_count
-                        else:
+                        # if not product_data:
+                        #     insert_result = await product.insert_one({"product_name": product_name})
+                        #     product_id = insert_result.inserted_id
+                        #     new_stock_count = stock_count
+                        
+                        new_stock_count = stock_count
+                        if edit_type == "Update":
                             stock_data = await stock.find_one({"product_id": product_data.get("_id"), "warung_id": warung_id})
                             if stock_data:
                                 new_stock_count = int(stock_data.get("stock_count")) + stock_count
