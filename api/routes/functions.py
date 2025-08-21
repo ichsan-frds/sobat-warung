@@ -58,7 +58,7 @@ def map_and_agg_sales_by_type(daily_sales_df, product_map, warung_info):
     df = daily_sales_df.copy()
     df['family'] = df['nama_produk'].str.lower().map(product_map)
     df.dropna(subset=['family'], inplace=True)
-    
+
     df = pd.merge(df, warung_info, on='store_nbr', how='left')
     df.dropna(subset=['type'], inplace=True)
     
