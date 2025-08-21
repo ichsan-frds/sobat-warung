@@ -477,7 +477,8 @@ async def whatsapp_webhook(request: Request):
                             stock_data = await stock.find_one({"product_id": product_data.get("_id"), "warung_id": warung_id})
                             if stock_data:
                                 new_stock_count = int(stock_data.get("stock_count")) + stock_count
-                            
+                            else:
+                                new_stock_count = stock_count
                             product_id = product_data["_id"]
 
                         await stock.update_one(
