@@ -660,7 +660,7 @@ async def send_collective_buying_message():
                 })
         
         pipeline = Aggregate.get_forecasted_products_group_by_kecamatan_pipeline(
-            # min_stores=1, min_units_per_store=1, dominance_gap_pct=0 # UNCOMMENT UNTUK TESTING
+            min_stores=1, min_units_per_store=1, dominance_gap_pct=0 # UNCOMMENT UNTUK TESTING
             )
         cursor = await forecast.aggregate(pipeline)
         results = await cursor.to_list(length=None)
