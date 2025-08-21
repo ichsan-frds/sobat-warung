@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Request, HTTPException
 from api.core.twilio import client
 import os
+import pandas as pd
 from api.misc.messages import Messages
 from api.misc.states import State
 from api.misc.aggregate import Aggregate
 from api.misc.utils import find_similar_product, predict_demand
 from api.core.database import owner, warung, stock, product, transaction, forecast, collective_buying
 from datetime import datetime, timedelta
-from .functions import get_bundling
+from .functions import get_bundling, run_prediction_pipeline
 
 router = APIRouter()
 
@@ -325,13 +326,30 @@ async def whatsapp_webhook(request: Request):
             today = datetime.now().date()
             normalized_today = datetime.combine(today, datetime.min.time())
             
-            today_transactions = await transaction.find({
-                "warung_id": warung_id,
-                "date": normalized_today
-            }).to_list(length=None)
+            today_transactions = pd.DataFrame(await transaction.find(
+                {
+                    "warung_id": warung_id,
+                    "date": normalized_today
+                },
+                {
+                    "warung_id": 1,
+                    "product_id": 1,
+                    "quantity_sold": 1,
+                    "_id": 0
+                }
+            ).to_list(length=None))
 
-            if today_transactions:
-                forecast_results = predict_demand(today_transactions)
+            warung_ids = today_transactions["warung_id"].unique().tolist()
+
+            warung_info = pd.DataFrame(
+                await warung.find(
+                    {"_id": {"$in": warung_ids}},
+                    {"type": 1, "_id": 0}
+                ).to_list(length=None)
+            )
+
+            if today_transactions and warung_info:
+                forecast_results = run_prediction_pipeline(today_transactions, warung_info)
                 
                 for f in forecast_results:
                     await forecast.update_one(
