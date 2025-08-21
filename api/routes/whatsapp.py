@@ -727,7 +727,7 @@ async def send_collective_buying_message():
 
                 await collective_buying.insert_one({
                     "date": datetime.combine(datetime.now().date(), datetime.min.time()),
-                    "kecamatan": kecamatan_data["kecamatan"],
+                    "kecamatan": kecamatan_data["_id"],
                     "warung_id": warung_id,
                     "product_ids": product_ids,
                     "total_units": total_units,
@@ -741,4 +741,4 @@ async def send_collective_buying_message():
                     price_after_disc=price_after_disc
                 ))
     except Exception as e:
-            print(e)
+        print(e)
