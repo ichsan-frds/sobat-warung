@@ -13,11 +13,11 @@ router = APIRouter()
 
 def send_message(to: str, body: str):
     print(body)
-    # return client.messages.create(
-    #     to=to,
-    #     from_=os.getenv("FROM_WA_NUMBER"),
-    #     body=body
-    # )
+    return client.messages.create(
+        to=to,
+        from_=os.getenv("FROM_WA_NUMBER"),
+        body=body
+    )
 
 @router.post("/")
 async def whatsapp_webhook(request: Request):
@@ -334,13 +334,16 @@ async def whatsapp_webhook(request: Request):
                 forecast_results = predict_demand(today_transactions)
                 
                 for f in forecast_results:
-                    await forecast.update_one({"warung_id": warung_id, "product_id": f["product_id"]},
-                    {
-                        "date": datetime.combine(datetime.now().date(), datetime.min.time()),
-                        "warung_id": warung_id,
-                        "product_id": f["product_id"],
-                        "predicted_sell": f["predicted_sell"]
-                    }, upsert=True)
+                    await forecast.update_one(
+                        {"warung_id": warung_id, "product_id": f["product_id"]},
+                        {"$set": {
+                            "date": datetime.combine(datetime.now().date(), datetime.min.time()),
+                            "warung_id": warung_id,
+                            "product_id": f["product_id"],
+                            "predicted_sell": f["predicted_sell"]
+                        }},
+                        upsert=True
+                    )
                     
                 insight_text = "Rekomendasi restock:\n"
                 for f in forecast_results:
@@ -348,9 +351,25 @@ async def whatsapp_webhook(request: Request):
                     prod_name = prod_data["product_name"] if prod_data else "Produk tidak diketahui"
                     insight_text += f"- {prod_name}: {f['predicted_sell']} pcs\n"
                 
+                insight_text += f"\nKetik Menu untuk kembali ke menu utama\n"
+                
                 send_message(form_data["From"], insight_text.strip())
             else:
+                owner_data = await owner.find_one({"phone_number": form_data["From"]})
+                owner_id = owner_data.get("_id")
+                owner_name = owner_data.get("owner_name", "Sobat Warung")
+                warung_data = await warung.find_one({"owner_id": owner_id})
+                warung_id = warung_data["_id"]
+
+                pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
+                cursor = await transaction.aggregate(pipeline)
+                count_transaction_days = await cursor.to_list(length=1)
+                days_left = 30 - count_transaction_days[0]["unique_days"]
+
+                credit_score = owner_data.get("credit_score", False)
+                
                 send_message(form_data["From"], "Belum ada transaksi hari ini. Silakan input data transaksi terlebih dahulu.")
+                send_message(form_data["From"], Messages.MENU_CREDIT_SCORE_MSG(owner_name, days_left, credit_score))
         
         elif form_data["Body"] == '3':
             # IF TOKO SUDAH INPUT STOK, FETCH STOK DARI DATABASE
@@ -377,7 +396,6 @@ async def whatsapp_webhook(request: Request):
                 
                 old_items = [item for item in results
                             if item['last_transaction'].date() <= two_weeks_ago]
-
                 
                 send_message(form_data["From"], Messages.MENU_3_CEK_STOK_MSG(stock_list))
                 
