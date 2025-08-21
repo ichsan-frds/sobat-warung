@@ -281,30 +281,57 @@ Mau ikut beli bersama?
 Iya -> Ketik *Ya*
 Tidak -> Ketik *Tidak*"""
 
-    def MENU_POST_COLLECTIVE_BUYING_MSG(owner_name: str, days_left: int, credit_score: bool = False):
+    def MENU_POST_COLLECTIVE_BUYING_MSG(owner_name: str, days_left: int, credit_score: bool = False, buying: bool = False):
         if credit_score:
-            message =  f"""Terimakasih telah ikut pembelian bersama {owner_name}!
-Selamat datang di Sobat Warung.
+            if buying:
+                message =  f"""Terimakasih telah ikut pembelian bersama, {owner_name}!
+    Selamat datang di Sobat Warung.
 
-*Selamat anda berhak meraih kesempatan untuk mengembangkan*
-*warung anda, Balas angka 4 untuk mempelajari lebih lanjut*
+    *Selamat anda berhak meraih kesempatan untuk mengembangkan*
+    *warung anda, Balas angka 4 untuk mempelajari lebih lanjut*
 
-Balas *angka* untuk pilih menu berikut :
-1. Setor Penjualan Hari Ini
-2. Prediksi Permintaan Besok
-3. Cek Stok Warung
-4. Kembangkan Bisnismu"""
+    Balas *angka* untuk pilih menu berikut :
+    1. Setor Penjualan Hari Ini
+    2. Prediksi Permintaan Besok
+    3. Cek Stok Warung
+    4. Kembangkan Bisnismu"""
+            else:
+                message =  f"""👋 Hai {owner_name}!
+    Selamat datang di Sobat Warung.
+
+    *Selamat anda berhak meraih kesempatan untuk mengembangkan*
+    *warung anda, Balas angka 4 untuk mempelajari lebih lanjut*
+
+    Balas *angka* untuk pilih menu berikut :
+    1. Setor Penjualan Hari Ini
+    2. Prediksi Permintaan Besok
+    3. Cek Stok Warung
+    4. Kembangkan Bisnismu"""
+                
         else:
-            message =  f"""Terimakasih telah ikut pembelian bersama {owner_name}!
-Selamat datang di Sobat Warung.
+            if buying:
+                message =  f"""Terimakasih telah ikut pembelian bersama {owner_name}!
+    Selamat datang di Sobat Warung.
 
-*Ayo setorkan penjualan harianmu setiap hari selama {days_left} hari ke*
-*depan dan raih kesempatan untuk mengembangkan bisnismu*
-*dengan pinjaman dana hingga Rp. 10.000.000*
+    *Ayo setorkan penjualan harianmu setiap hari selama {days_left} hari ke*
+    *depan dan raih kesempatan untuk mengembangkan bisnismu*
+    *dengan pinjaman dana hingga Rp. 10.000.000*
 
-Balas *angka* untuk pilih menu berikut :
-1. Setor Penjualan Hari Ini
-2. Prediksi Permintaan Besok
-3. Cek Stok Warung"""
+    Balas *angka* untuk pilih menu berikut :
+    1. Setor Penjualan Hari Ini
+    2. Prediksi Permintaan Besok
+    3. Cek Stok Warung"""
+            else:
+                message =  f"""👋 Hai {owner_name}!
+    Selamat datang di Sobat Warung.
+
+    *Ayo setorkan penjualan harianmu setiap hari selama {days_left} hari ke*
+    *depan dan raih kesempatan untuk mengembangkan bisnismu*
+    *dengan pinjaman dana hingga Rp. 10.000.000*
+
+    Balas *angka* untuk pilih menu berikut :
+    1. Setor Penjualan Hari Ini
+    2. Prediksi Permintaan Besok
+    3. Cek Stok Warung"""
         
         return message

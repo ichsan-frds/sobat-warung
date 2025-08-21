@@ -601,6 +601,7 @@ async def whatsapp_webhook(request: Request):
             warung_id = warung_data["_id"]
             
             if form_data["Body"] == 'Ya':
+                buying = True
 
                 latest_entry = await collective_buying.find_one(
                     {"warung_id": warung_id, "user_responded": False},
@@ -616,6 +617,8 @@ async def whatsapp_webhook(request: Request):
                     raise HTTPException(status_code=404, detail="Tidak ada pembelian kolektif yang aktif")
 
             elif form_data["Body"] == 'Tidak':
+                buying = False
+
                 await collective_buying.delete_one({
                     "warung_id": warung_id,
                     "user_responded": False
@@ -641,7 +644,7 @@ async def whatsapp_webhook(request: Request):
 
             credit_score = owner_data.get("credit_score", False)
                     
-            send_message(form_data["From"], Messages.MENU_POST_COLLECTIVE_BUYING_MSG(owner_name, days_left, credit_score))
+            send_message(form_data["From"], Messages.MENU_POST_COLLECTIVE_BUYING_MSG(owner_name, days_left, credit_score, buying))
 
         except Exception as e:
             print(e)
