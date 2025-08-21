@@ -41,7 +41,8 @@ class Aggregate():
                 "_id": 0,
                 "product_name": "$product_data.product_name",
                 "stock_count": "$stock_data.stock_count",
-                "price": "$stock_data.price"
+                "price": "$stock_data.price",
+                "last_transaction": "$stock_data.last_transaction"
             }}
         ]
     
