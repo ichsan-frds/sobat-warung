@@ -549,7 +549,7 @@ async def whatsapp_webhook(request: Request):
                             if stock_data:
                                 new_stock_count = int(stock_data.get("stock_count")) + stock_count
                         product_id = product_data["_id"]
-
+                        
                         await stock.update_one(
                             {"warung_id": warung_id, "product_id": product_id},
                             {
@@ -679,6 +679,7 @@ async def whatsapp_webhook(request: Request):
             warung_id = warung_data["_id"]
             
             if form_data["Body"] == 'Ya':
+                buying = True
 
                 latest_entry = await collective_buying.find_one(
                     {"warung_id": warung_id, "user_responded": False},
@@ -694,6 +695,8 @@ async def whatsapp_webhook(request: Request):
                     raise HTTPException(status_code=404, detail="Tidak ada pembelian kolektif yang aktif")
 
             elif form_data["Body"] == 'Tidak':
+                buying = False
+
                 await collective_buying.delete_one({
                     "warung_id": warung_id,
                     "user_responded": False
@@ -719,7 +722,7 @@ async def whatsapp_webhook(request: Request):
 
             credit_score = owner_data.get("credit_score", False)
                     
-            send_message(form_data["From"], Messages.MENU_POST_COLLECTIVE_BUYING_MSG(owner_name, days_left, credit_score))
+            send_message(form_data["From"], Messages.MENU_POST_COLLECTIVE_BUYING_MSG(owner_name, days_left, credit_score, buying))
 
         except Exception as e:
             print(e)
@@ -738,7 +741,7 @@ async def send_collective_buying_message():
                 })
         
         pipeline = Aggregate.get_forecasted_products_group_by_kecamatan_pipeline(
-            # min_stores=1, min_units_per_store=1, dominance_gap_pct=0 # UNCOMMENT UNTUK TESTING
+            min_stores=1, min_units_per_store=1, dominance_gap_pct=0 # UNCOMMENT UNTUK TESTING
             )
         cursor = await forecast.aggregate(pipeline)
         results = await cursor.to_list(length=None)
@@ -805,7 +808,7 @@ async def send_collective_buying_message():
 
                 await collective_buying.insert_one({
                     "date": datetime.combine(datetime.now().date(), datetime.min.time()),
-                    "kecamatan": kecamatan_data["kecamatan"],
+                    "kecamatan": kecamatan_data["_id"],
                     "warung_id": warung_id,
                     "product_ids": product_ids,
                     "total_units": total_units,
@@ -813,10 +816,11 @@ async def send_collective_buying_message():
                     "user_responded": False
                 })
 
+                print(f"Sending collective buying message to {phone_number}")
                 send_message(phone_number, Messages.COLLECTIVE_BUYING_MSG(
                     unique_owner_ids=unique_owner_ids,
                     produk_str=produk_str,
                     price_after_disc=price_after_disc
                 ))
     except Exception as e:
-            print(e)
+        print(e)
