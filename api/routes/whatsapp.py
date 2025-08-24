@@ -199,7 +199,7 @@ async def whatsapp_webhook(request: Request):
             pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
             cursor = await transaction.aggregate(pipeline)
             count_transaction_days = await cursor.to_list(length=1)
-            days_left = 30 - count_transaction_days[0]["unique_days"]
+            days_left = 30 - count_transaction_days[0]["unique_days"] if count_transaction_days else 30
 
             credit_score = owner_data.get("credit_score", False)
             send_message(form_data["From"], Messages.MENU_CREDIT_SCORE_MSG(owner_name, days_left, credit_score))
@@ -260,7 +260,7 @@ async def whatsapp_webhook(request: Request):
 
                     product_data = await find_similar_product(product_name)
                     if not product_data:
-                        raise HTTPException(status_code=404, detail=f"Produk '{name}' tidak ditemukan")
+                        raise HTTPException(status_code=404, detail=f"Produk '{product_name}' tidak ditemukan")
                     else:
                         product_id = product_data["_id"]
 
@@ -306,7 +306,14 @@ async def whatsapp_webhook(request: Request):
                 pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
                 cursor = await transaction.aggregate(pipeline)
                 count_transaction_days = await cursor.to_list(length=1)
-                days_left = 30 - count_transaction_days[0]["unique_days"]
+                if count_transaction_days[0]["unique_days"] >= 30:
+                    await owner.update_one({"phone_number": form_data["From"]}, {
+                        "$set": {
+                            "credit_score": True
+                            }
+                        })
+                    credit_score = True
+                days_left = 30 - count_transaction_days[0]["unique_days"] if count_transaction_days else 30
                 send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_name, days_left, credit_score))
 
             except Exception as e:
@@ -393,7 +400,7 @@ async def whatsapp_webhook(request: Request):
                 pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
                 cursor = await transaction.aggregate(pipeline)
                 count_transaction_days = await cursor.to_list(length=1)
-                days_left = 30 - count_transaction_days[0]["unique_days"]
+                days_left = 30 - count_transaction_days[0]["unique_days"] if count_transaction_days else 30
 
                 credit_score = owner_data.get("credit_score", False)
                 
@@ -446,7 +453,7 @@ async def whatsapp_webhook(request: Request):
             pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
             cursor = await transaction.aggregate(pipeline)
             count_transaction_days = await cursor.to_list(length=1)
-            days_left = 30 - count_transaction_days[0]["unique_days"]
+            days_left = 30 - count_transaction_days[0]["unique_days"] if count_transaction_days else 30
 
             send_message(form_data["From"], Messages.CREDIT_SCORE_MSG)
             send_message(form_data["From"], Messages.MENU_CREDIT_SCORE_MSG(owner_name, days_left, credit_score))
@@ -466,7 +473,7 @@ async def whatsapp_webhook(request: Request):
             pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
             cursor = await transaction.aggregate(pipeline)
             count_transaction_days = await cursor.to_list(length=1)
-            days_left = 30 - count_transaction_days[0]["unique_days"]
+            days_left = 30 - count_transaction_days[0]["unique_days"] if count_transaction_days else 30
 
             send_message(form_data["From"], Messages.MENU_CREDIT_SCORE_MSG(owner_name, days_left, credit_score))
 
@@ -492,7 +499,7 @@ async def whatsapp_webhook(request: Request):
             pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
             cursor = await transaction.aggregate(pipeline)
             count_transaction_days = await cursor.to_list(length=1)
-            days_left = 30 - count_transaction_days[0]["unique_days"]
+            days_left = 30 - count_transaction_days[0]["unique_days"] if count_transaction_days else 30
 
             credit_score = owner_data.get("credit_score", False)
             send_message(form_data["From"], Messages.MENU_CREDIT_SCORE_MSG(owner_name, days_left, credit_score))
@@ -537,16 +544,23 @@ async def whatsapp_webhook(request: Request):
                         #     new_stock_count = stock_count
                         
                         new_stock_count = stock_count
-                        if edit_type == "Update":
+                        if edit_type == "Tambah":
                             stock_data = await stock.find_one({"product_id": product_data.get("_id"), "warung_id": warung_id})
                             if stock_data:
                                 new_stock_count = int(stock_data.get("stock_count")) + stock_count
-                            
-                            product_id = product_data["_id"]
+                        product_id = product_data["_id"]
 
                         await stock.update_one(
                             {"warung_id": warung_id, "product_id": product_id},
-                            {"$set": {"stock_count": new_stock_count, "price": price, "last_transaction": datetime.combine(datetime.now().date(), datetime.min.time())}},
+                            {
+                                "$set": {
+                                    "stock_count": new_stock_count,
+                                    "price": price
+                                },
+                                "$setOnInsert": {
+                                    "last_transaction": datetime.combine(datetime.now().date(), datetime.min.time())
+                                }
+                            },
                             upsert=True
                         )
                 else:
@@ -578,7 +592,7 @@ async def whatsapp_webhook(request: Request):
                 pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
                 cursor = await transaction.aggregate(pipeline)
                 count_transaction_days = await cursor.to_list(length=1)
-                days_left = 30 - count_transaction_days[0]["unique_days"]
+                days_left = 30 - count_transaction_days[0]["unique_days"] if count_transaction_days else 30
 
                 credit_score = owner_data.get("credit_score", False)
                 send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_name, days_left, credit_score))
@@ -605,7 +619,7 @@ async def whatsapp_webhook(request: Request):
             pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
             cursor = await transaction.aggregate(pipeline)
             count_transaction_days = await cursor.to_list(length=1)
-            days_left = 30 - count_transaction_days[0]["unique_days"]
+            days_left = 30 - count_transaction_days[0]["unique_days"] if count_transaction_days else 30
 
             credit_score = owner_data.get("credit_score", False)
             send_message(form_data["From"], Messages.MENU_CREDIT_SCORE_MSG(owner_name, days_left, credit_score))
@@ -628,8 +642,7 @@ async def whatsapp_webhook(request: Request):
 
                     product_data = await find_similar_product(product_name)
                     if not product_data:
-                        insert_result = await product.insert_one({"product_name": product_name})
-                        product_id = insert_result.inserted_id
+                        raise HTTPException(status_code=404, detail=f"Produk '{product_name}' tidak ditemukan")
                     else:
                         product_id = product_data["_id"]
                     
@@ -651,7 +664,7 @@ async def whatsapp_webhook(request: Request):
                 pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
                 cursor = await transaction.aggregate(pipeline)
                 count_transaction_days = await cursor.to_list(length=1)
-                days_left = 30 - count_transaction_days[0]["unique_days"]
+                days_left = 30 - count_transaction_days[0]["unique_days"] if count_transaction_days else 30
 
                 credit_score = owner_data.get("credit_score", False)
                 send_message(form_data["From"], Messages.MENU_POST_INPUT_MSG(owner_name, days_left, credit_score))
@@ -702,7 +715,7 @@ async def whatsapp_webhook(request: Request):
             pipeline = Aggregate.get_days_left_by_warung_pipeline(warung_id)
             cursor = await transaction.aggregate(pipeline)
             count_transaction_days = await cursor.to_list(length=1)
-            days_left = 30 - count_transaction_days[0]["unique_days"]
+            days_left = 30 - count_transaction_days[0]["unique_days"] if count_transaction_days else 30
 
             credit_score = owner_data.get("credit_score", False)
                     
